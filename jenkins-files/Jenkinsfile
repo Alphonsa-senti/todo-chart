@@ -27,19 +27,22 @@ pipeline {
 
                     if (drafts) {
                         // Extract the latest version tag (assumes semantic versioning vX.Y.Z)
-                        def latestTag = drafts.split('\n')[0].split()[0]
-                        echo "Latest draft tag: ${latestTag}"
-
-                        def parts = latestTag.replace(DRAFT_PREFIX,'').tokenize('.').collect { it as int }
-                        // Keep same draft if it exists (overwrite)
-                        env.NEXT_TAG = "${DRAFT_PREFIX}${parts[0]}.${parts[1]}.${parts[2]}"
+                        denv.NEXT_TAG = drafts.split('\n')[0].trim()
+                        echo "Using existing draft tag: ${env.NEXT_TAG}"
                     } else {
-                        // No draft exists yet, start from v0.0.1
-                        env.NEXT_TAG = "${DRAFT_PREFIX}0.0.1"
+                        def latestRelease = sh(
+                            script: "gh release list --repo ${REPO} --json tagName --jq '.[0].tagName'",
+                            returnStdout: true
+                        ).trim()
+                        if (latestRelease) {
+                            def parts = latestRelease.replace(DRAFT_PREFIX,'').tokenize('.').collect { it as int }
+                            parts[2] = parts[2] + 1
+                            env.NEXT_TAG = "${DRAFT_PREFIX}${parts[0]}.${parts[1]}.${parts[2]}"
+                        } else {
+                            env.NEXT_TAG = "${DRAFT_PREFIX}0.0.1"
+                        }
+                        echo "No draft found, creating new tag: ${env.NEXT_TAG}"
                     }
-
-                    echo "Next draft tag: ${env.NEXT_TAG}"
-                }
             }
         }
 
@@ -48,7 +51,7 @@ pipeline {
                 script {
                     // Check if a draft with this tag exists
                     def existingDraft = sh(
-                        script: "gh release view ${env.NEXT_TAG} --repo ${REPO} --json draft --jq '.draft' || echo 'false'",
+                        script: "gh release view ${env.NEXT_TAG} --repo ${REPO} --json isDraft --jq '.isDraft' || echo 'false'",
                         returnStdout: true
                     ).trim()
 
@@ -58,7 +61,7 @@ pipeline {
                         export GITHUB_TOKEN=${GITHUB_TOKEN}
                         gh release edit ${env.NEXT_TAG} \
                             --repo ${REPO} \
-                            --title "${DRAFT_NAME} ${env.NEXT_TAG}" \
+                            --title "${env.NEXT_TAG}" \
                             --notes "Updated draft from Jenkins pipeline"
                         """
                         echo "Draft ${env.NEXT_TAG} updated successfully."
@@ -69,7 +72,7 @@ pipeline {
                         gh release create ${env.NEXT_TAG} \
                             --repo ${REPO} \
                             --draft \
-                            --title "${DRAFT_NAME} ${env.NEXT_TAG}" \
+                            --title "${env.NEXT_TAG}" \
                             --notes "Automated draft created from Jenkins pipeline"
                         """
                         echo "Draft ${env.NEXT_TAG} created successfully."
