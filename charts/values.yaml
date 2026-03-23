@@ -39,3 +39,4 @@ mysql:
   user: "root"
   service:
     port: 3306
+
