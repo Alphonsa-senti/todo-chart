@@ -4,23 +4,31 @@ def K8S_DEPLOY_VALUE_FILE = "./charts/values.yaml"
 pipeline {
   agent any
 
+  environment {
+    RELEASE_TAG = ''
+  }
+
   stages {
 
-    stage('Release Triggered Build') {
+    stage('Check Release Event') {
         steps {
             script {
-                def payload = readJSON text: env.GITHUB_PAYLOAD ?: '{}'
+                def action = sh(
+                    script: "echo '${env.GITHUB_PAYLOAD}' | jq -r .action",
+                    returnStdout: true
+                ).trim()
 
-                if (payload.action == 'published') {
-                    env.RELEASE_TAG = payload.release.tag_name
+                if (action == 'published') {
+
+                    env.RELEASE_TAG = sh(
+                        script: "echo '${env.GITHUB_PAYLOAD}' | jq -r .release.tag_name",
+                        returnStdout: true
+                    ).trim()
+
                     echo "Release published! Tag: ${env.RELEASE_TAG}"
 
-                    build job: 'release-build', wait: false, parameters: [
-                        string(name: 'RELEASE_TAG', value: env.RELEASE_TAG)
-                    ]
-
                 } else {
-                    echo "Not a release publish event."
+                    echo "Not a release publish event"
                 }
             }
         }
