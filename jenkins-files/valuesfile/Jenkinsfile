@@ -9,19 +9,18 @@ pipeline {
     stage('Release Triggered Build') {
         steps {
             script {
-                if (env.GITHUB_EVENT_NAME == 'release') {
-                    if (env.GITHUB_EVENT_ACTION == 'published') {
-                        env.RELEASE_TAG = env.GITHUB_REF_NAME
-                        echo "Release published! Tag: ${env.RELEASE_TAG}. Triggering downstream job..."
+                def payload = readJSON text: env.GITHUB_PAYLOAD ?: '{}'
 
-                        build job: 'release-build', wait: false, parameters: [
-                            string(name: 'RELEASE_TAG', value: env.RELEASE_TAG)
-                        ]
-                    } else {
-                        echo "Not a publish action, skipping."
-                    }
+                if (payload.action == 'published') {
+                    env.RELEASE_TAG = payload.release.tag_name
+                    echo "Release published! Tag: ${env.RELEASE_TAG}"
+
+                    build job: 'release-build', wait: false, parameters: [
+                        string(name: 'RELEASE_TAG', value: env.RELEASE_TAG)
+                    ]
+
                 } else {
-                    echo "Not a release event."
+                    echo "Not a release publish event."
                 }
             }
         }
