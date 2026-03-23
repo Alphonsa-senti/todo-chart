@@ -50,6 +50,11 @@ pipeline {
         stage('Create or Update Draft') {
             steps {
                 script {
+                    def latestCommitMessage = sh(
+                        script: "git log -1 --pretty=%B",
+                        returnStdout: true
+                    ).trim()
+                    echo "Latest commit message: ${latestCommitMessage}"
                     // Check if a draft with this tag exists
                     def existingDraft = sh(
                         script: "gh release view ${env.NEXT_TAG} --repo ${REPO} --json isDraft --jq '.isDraft' || echo 'false'",
@@ -63,7 +68,7 @@ pipeline {
                         gh release edit ${env.NEXT_TAG} \
                             --repo ${REPO} \
                             --title "${env.NEXT_TAG}" \
-                            --notes "Updated draft from Jenkins pipeline"
+                            --notes "${latestCommitMessage}"
                         """
                         echo "Draft ${env.NEXT_TAG} updated successfully."
                     } else {
