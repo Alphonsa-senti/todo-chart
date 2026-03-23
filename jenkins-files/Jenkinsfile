@@ -43,6 +43,7 @@ pipeline {
                         }
                         echo "No draft found, creating new tag: ${env.NEXT_TAG}"
                     }
+               }
             }
         }
 
