@@ -27,7 +27,7 @@ pipeline {
 
                     if (drafts) {
                         // Extract the latest version tag (assumes semantic versioning vX.Y.Z)
-                        denv.NEXT_TAG = drafts.split('\n')[0].trim()
+                        env.NEXT_TAG = drafts.split('\n')[0].trim()
                         echo "Using existing draft tag: ${env.NEXT_TAG}"
                     } else {
                         def latestRelease = sh(
