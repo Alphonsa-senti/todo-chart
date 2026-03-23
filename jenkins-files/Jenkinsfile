@@ -47,31 +47,37 @@ pipeline {
             }
         }
 
-        stage('Create or Update Draft') {
+        stage('Generate Release Notes') {
             steps {
                 script {
-                    def previousTag = sh(
-                        script: "gh release list --repo ${REPO} --json tagName --jq '.[0].tagName' || echo ''",
+                    def latestPublishedTag = sh(
+                        script: "gh release list --repo ${REPO} --json tagName,isDraft --jq '.[] | select(.isDraft==false) | .tagName' | head -n 1 || echo ''",
                         returnStdout: true
                     ).trim()
 
-                    // Get all commits from previousTag to HEAD
                     def releaseNotes = ""
-                    if (previousTag) {
+                    if (latestPublishedTag) {
                         releaseNotes = sh(
-                            script: "git log ${previousTag}..HEAD --pretty=format:'%h %s (%an)'",
+                            script: "git log ${latestPublishedTag}..HEAD --pretty=format:'%h %s (%an)'",
                             returnStdout: true
                         ).trim()
                     } else {
-                        // If no previous tag, include all commits
+                        // First release: include all commits
                         releaseNotes = sh(
                             script: "git log --pretty=format:'%h %s (%an)'",
                             returnStdout: true
                         ).trim()
                     }
 
-                    echo "Release notes:\n${releaseNotes}"
-                    // Check if a draft with this tag exists
+                    env.RELEASE_NOTES = releaseNotes
+                    echo "Release notes:\n${env.RELEASE_NOTES}"
+                }
+            }
+        }
+        
+        stage('Create or Update Draft') {
+            steps {
+                script {
                     def existingDraft = sh(
                         script: "gh release view ${env.NEXT_TAG} --repo ${REPO} --json isDraft --jq '.isDraft' || echo 'false'",
                         returnStdout: true
@@ -84,7 +90,7 @@ pipeline {
                         gh release edit ${env.NEXT_TAG} \
                             --repo ${REPO} \
                             --title "${env.NEXT_TAG}" \
-                            --notes "${releaseNotes}"
+                            --notes "${env.RELEASE_NOTES}"
                         """
                         echo "Draft ${env.NEXT_TAG} updated successfully."
                     } else {
@@ -95,7 +101,7 @@ pipeline {
                             --repo ${REPO} \
                             --draft \
                             --title "${env.NEXT_TAG}" \
-                            --notes "Automated draft created from Jenkins pipeline"
+                            --notes "${env.RELEASE_NOTES}"
                         """
                         echo "Draft ${env.NEXT_TAG} created successfully."
                     }
