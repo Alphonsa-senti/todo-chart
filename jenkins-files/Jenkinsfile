@@ -50,11 +50,27 @@ pipeline {
         stage('Create or Update Draft') {
             steps {
                 script {
-                    def latestCommitMessage = sh(
-                        script: "git log -1 --pretty=%B",
+                    def previousTag = sh(
+                        script: "gh release list --repo ${REPO} --json tagName --jq '.[0].tagName' || echo ''",
                         returnStdout: true
                     ).trim()
-                    echo "Latest commit message: ${latestCommitMessage}"
+
+                    // Get all commits from previousTag to HEAD
+                    def releaseNotes = ""
+                    if (previousTag) {
+                        releaseNotes = sh(
+                            script: "git log ${previousTag}..HEAD --pretty=format:'%h %s (%an)'",
+                            returnStdout: true
+                        ).trim()
+                    } else {
+                        // If no previous tag, include all commits
+                        releaseNotes = sh(
+                            script: "git log --pretty=format:'%h %s (%an)'",
+                            returnStdout: true
+                        ).trim()
+                    }
+
+                    echo "Release notes:\n${releaseNotes}"
                     // Check if a draft with this tag exists
                     def existingDraft = sh(
                         script: "gh release view ${env.NEXT_TAG} --repo ${REPO} --json isDraft --jq '.isDraft' || echo 'false'",
@@ -68,7 +84,7 @@ pipeline {
                         gh release edit ${env.NEXT_TAG} \
                             --repo ${REPO} \
                             --title "${env.NEXT_TAG}" \
-                            --notes "${latestCommitMessage}"
+                            --notes "${releaseNotes}"
                         """
                         echo "Draft ${env.NEXT_TAG} updated successfully."
                     } else {
