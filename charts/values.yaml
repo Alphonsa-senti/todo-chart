@@ -43,4 +43,4 @@ mysql:
 
 image:
   pullPolicy: IfNotPresent
-  tag: v0.0.7
+  tag: v0.0.8
