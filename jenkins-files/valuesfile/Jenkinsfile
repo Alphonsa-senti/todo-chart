@@ -1,4 +1,4 @@
-def K8S_REPO_BRANCH = params.K8S_REPO_BRANCH
+def K8S_REPO_BRANCH = 'main'
 def K8S_DEPLOY_VALUE_FILE = "./charts/values.yaml"
 
 pipeline {
