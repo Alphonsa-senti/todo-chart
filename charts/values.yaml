@@ -40,3 +40,4 @@ mysql:
   service:
     port: 3306
 
+test:
