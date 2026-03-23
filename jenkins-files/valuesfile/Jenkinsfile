@@ -1,0 +1,50 @@
+def K8S_REPO_BRANCH = params.K8S_REPO_BRANCH
+def K8S_DEPLOY_VALUE_FILE = "./charts/values.yaml"
+
+pipeline {
+  agent any
+
+  stages {
+
+    stage('Release Triggered Build') {
+        steps {
+            script {
+                if (env.GITHUB_EVENT_NAME == 'release') {
+                    def action = sh(script: "echo ${env.GITHUB_EVENT_ACTION}", returnStdout: true).trim()
+                    if (action == 'published') {
+                        def releaseTag = env.GITHUB_REF_NAME
+                        echo "Release published! Tag: ${releaseTag}. Triggering downstream job..."
+
+                        build job: 'release-build', wait: false, parameters: [
+                            string(name: 'RELEASE_TAG', value: releaseTag)
+                        ]
+                    } else {
+                        echo "Not a publish action, skipping."
+                    }
+                } else {
+                    echo "Not a release event."
+                }
+            }
+        }
+    }
+
+    stage('Build Docker Image') {
+      steps {
+        sshagent(credentials: ['basedynamics']) {
+          script {
+            sh """
+            git checkout ${K8S_REPO_BRANCH} && git pull origin ${K8S_REPO_BRANCH} --no-rebase
+            sed -i "s/^\\(\\s*tag:\\s*\\).*/\\1${RELEASE_TAG}/" ${K8S_DEPLOY_VALUE_FILE}
+            git add ${K8S_DEPLOY_VALUE_FILE}
+            git commit -m "Latest Docker Image Tag Update: ${RELEASE_TAG}"
+            git push origin ${K8S_REPO_BRANCH}
+            """
+          }
+        }
+      }
+    }
+
+  
+  }
+}
+
