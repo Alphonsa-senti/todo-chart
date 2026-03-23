@@ -21,7 +21,7 @@ pipeline {
                 script {
                     // Get the latest draft release
                     def drafts = sh(
-                        script: "gh release list --repo ${REPO} --draft --limit 100",
+                        script: "gh release list --repo ${REPO} --json tagName,draft --jq '.[] | select(.draft==true) | .tagName'",
                         returnStdout: true
                     ).trim()
 
