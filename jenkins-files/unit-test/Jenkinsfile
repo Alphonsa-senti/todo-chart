@@ -39,14 +39,17 @@ pipeline {
     }
 
     stage('Integration Tests') {
-      steps {
-        sh 'mvn verify -DskipUnitTests=true'
-      }
-      post {
-        always {
-          junit '**/target/failsafe-reports/*.xml'
+        steps {
+            dir('.') {
+            sh 'mvn verify -DskipUnitTests=true'
+            sh 'ls -l target/failsafe-reports/' 
+            }
         }
-      }
+        post {
+            always {
+            junit 'target/failsafe-reports/*.xml'
+            }
+        }
     }
 
     stage('Code Coverage') {
