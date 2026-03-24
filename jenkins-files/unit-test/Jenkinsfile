@@ -25,14 +25,17 @@ pipeline {
     }
 
     stage('Unit Tests') {
-      steps {
-        sh 'mvn test'
-      }
-      post {
-        always {
-          junit '**/target/surefire-reports/*.xml'
+        steps {
+            dir('.') {
+            sh 'mvn test'
+            sh 'ls -l target/surefire-reports/'
+            }
         }
-      }
+        post {
+            always {
+            junit 'target/surefire-reports/*.xml'
+            }
+        }
     }
 
     stage('Integration Tests') {
