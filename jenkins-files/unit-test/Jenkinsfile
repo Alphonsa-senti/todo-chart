@@ -80,12 +80,11 @@ pipeline {
   }
 
   post {
-    always {
-        script {
-            if (currentBuild.result != 'SUCCESS') {
-                error("Build failed. Cannot merge.")
-            }
-        }
+    success {
+      githubNotify context: 'CI/CD', status: 'SUCCESS', description: 'Build passed', targetUrl: env.BUILD_URL
     }
-}
+    failure {
+      githubNotify context: 'CI/CD', status: 'FAILURE', description: 'Build failed', targetUrl: env.BUILD_URL
+    }
+  }
 }
