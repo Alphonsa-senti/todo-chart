@@ -37,7 +37,7 @@ pipeline {
             allowMissing: true
             ])
         }
-      }
+        }
     }
 
     stage('Integration Tests') {
