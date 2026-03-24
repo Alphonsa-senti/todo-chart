@@ -80,11 +80,12 @@ pipeline {
   }
 
   post {
-    success {
-      echo 'All tests passed'
+    always {
+        script {
+            if (currentBuild.result != 'SUCCESS') {
+                error("Build failed. Cannot merge.")
+            }
+        }
     }
-    failure {
-      echo 'Tests failed'
-    }
-  }
+}
 }
