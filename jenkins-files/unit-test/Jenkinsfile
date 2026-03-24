@@ -1,4 +1,4 @@
-def BRANCH = params.BRANCH ?: 'main'
+BRANCH = "${env.CHANGE_BRANCH ?: 'main'}"
 
 pipeline {
   agent any
