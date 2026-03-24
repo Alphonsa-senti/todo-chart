@@ -1,0 +1,76 @@
+def BRANCH = params.BRANCH ?: 'main'
+
+pipeline {
+  agent any
+
+  tools {
+    maven 'Maven 3.9.11'
+  }
+
+  stages {
+
+    stage('Checkout') {
+      steps {
+        git checkout "${BRANCH}" && git pull origin "${BRANCH}" --no-rebase
+      }
+    }
+
+    stage('Compile') {
+      steps {
+        sh 'mvn clean compile'
+      }
+    }
+
+    stage('Unit Tests') {
+      steps {
+        sh 'mvn test'
+      }
+      post {
+        always {
+          junit '**/target/surefire-reports/*.xml'
+        }
+      }
+    }
+
+    stage('Integration Tests') {
+      steps {
+        sh 'mvn verify -DskipUnitTests=true'
+      }
+      post {
+        always {
+          junit '**/target/failsafe-reports/*.xml'
+        }
+      }
+    }
+
+    stage('Code Coverage') {
+      steps {
+        sh 'mvn clean test jacoco:report'
+      }
+      post {
+        always {
+          publishHTML([
+            reportDir: 'target/site/jacoco',
+            reportFiles: 'index.html',
+            reportName: 'JaCoCo Coverage Report'
+          ])
+        }
+      }
+    }
+
+    stage('Package') {
+      steps {
+        sh 'mvn package -DskipTests'
+      }
+    }
+  }
+
+  post {
+    success {
+      echo 'All tests passed'
+    }
+    failure {
+      echo 'Tests failed'
+    }
+  }
+}
