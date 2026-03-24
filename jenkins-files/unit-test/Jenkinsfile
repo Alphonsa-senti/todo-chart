@@ -1,4 +1,4 @@
-BRANCH = "${env.CHANGE_BRANCH ?: 'main'}"
+BRANCH = "${env.source_branch ?: 'main'}"
 
 pipeline {
   agent any
