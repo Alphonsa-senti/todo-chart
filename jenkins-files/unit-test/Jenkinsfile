@@ -11,8 +11,7 @@ pipeline {
 
     stage('Checkout') {
       steps {
-        // sh """git checkout ${BRANCH} && git pull origin ${BRANCH} --no-rebase"""
-        checkout scm
+        sh """git checkout ${BRANCH} && git pull origin ${BRANCH} --no-rebase"""
       }
     }
 
@@ -22,23 +21,23 @@ pipeline {
       }
     }
 
-    stage('Unit Tests') {
-      steps {
-        sh 'mvn test'
-      }
-      post {
-        always {
+    stage('Code Coverage') {
+        steps {
+            sh 'mvn clean test jacoco:report'
+        }
+        post {
+            always {
             publishHTML([
-            reportDir: 'target/site/jacoco',
-            reportFiles: 'index.html',
-            reportName: 'JaCoCo Coverage Report',
-            keepAll: true,
-            alwaysLinkToLastBuild: true,
-            allowMissing: true
+                reportDir: 'target/site/jacoco',
+                reportFiles: 'index.html',
+                reportName: 'JaCoCo Coverage Report',
+                keepAll: true,
+                alwaysLinkToLastBuild: true,
+                allowMissing: true
             ])
+            }
         }
         }
-    }
 
     stage('Integration Tests') {
       steps {
