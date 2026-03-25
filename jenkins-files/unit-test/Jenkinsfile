@@ -46,14 +46,6 @@ pipeline {
             sh 'mvn clean test jacoco:report'
         }
     }
-
-    stage('Debug Credentials') {
-      steps {
-        withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
-          sh 'echo "Token loaded successfully"'
-        }
-      }
-    }
   }
 
 
