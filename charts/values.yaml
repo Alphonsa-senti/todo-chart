@@ -43,4 +43,4 @@ mysql:
 
 image:
   pullPolicy: IfNotPresent
-  tag: v0.0.8
+  tag: staging-release-20260325-104714
