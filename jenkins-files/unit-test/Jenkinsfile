@@ -57,7 +57,7 @@ pipeline {
         targetUrl: env.BUILD_URL,
         repo: 'todo-chart',
         account: 'Alphonsa-senti',
-        credentialsId: 'basedynamics',
+        credentialsId: 'git-cred',
         sha: env.GIT_COMMIT
       )
     }
@@ -69,7 +69,7 @@ pipeline {
         targetUrl: env.BUILD_URL,
         repo: 'todo-chart',
         account: 'Alphonsa-senti',
-        credentialsId: 'basedynamics',
+        credentialsId: 'git-cred',
         sha: env.GIT_COMMIT
       )
     }
