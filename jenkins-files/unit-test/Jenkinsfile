@@ -1,4 +1,4 @@
-BRANCH = "${env.source_branch ?: 'main'}"
+def BRANCH = "${env.source_branch ?: 'main'}"
 
 pipeline {
   agent any
@@ -81,10 +81,10 @@ pipeline {
 
   post {
     success {
-      githubNotify context: 'CI/CD', status: 'SUCCESS', description: 'Build passed', targetUrl: env.BUILD_URL
+        githubNotify context: 'CI/CD', status: 'SUCCESS', description: 'Build passed', targetUrl: env.BUILD_URL
     }
     failure {
-      githubNotify context: 'CI/CD', status: 'FAILURE', description: 'Build failed', targetUrl: env.BUILD_URL
+        githubNotify context: 'CI/CD', status: 'FAILURE', description: 'Build failed', targetUrl: env.BUILD_URL
     }
   }
 }
