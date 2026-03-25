@@ -21,7 +21,7 @@
     </dependencies>
 
     <!-- Build configuration -->
-    <!-- <build> -->
+    <build>
         <plugins>
 
             <!-- Surefire -->
@@ -50,9 +50,9 @@
                         </goals>
                     </execution>
                 </executions>
-            <!-- </plugin> -->
+            </plugin>
 
         </plugins>
-    <!-- </build> -->
+    </build>
 
 </project>
