@@ -11,8 +11,17 @@ pipeline {
 
     stage('Checkout') {
       steps {
-        // sh """git checkout ${BRANCH} && git pull origin ${BRANCH} --no-rebase"""
-        checkout scm
+        script {
+          def branchToBuild = env.source_branch ?: 'main'
+          checkout([
+            $class: 'GitSCM',
+            branches: [[name: "*/${branchToBuild}"]],
+            userRemoteConfigs: [[
+              url: 'https://github.com/Alphonsa-senti/todo-chart.git',
+              credentialsId: 'basedynamics'
+            ]]
+          ])
+        }
       }
     }
 
@@ -37,30 +46,52 @@ pipeline {
             sh 'mvn clean test jacoco:report'
         }
     }
+
+    stage('Debug Credentials') {
+      steps {
+        withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
+          sh 'echo "Token loaded successfully"'
+        }
+      }
+    }
   }
+
 
   post {
     success {
-        githubNotify(
-            context: 'CI/CD',
-            status: 'SUCCESS',
-            description: 'Build passed',
-            targetUrl: env.BUILD_URL,
-            repo: 'Alphonsa-senti/todo-chart',
-            credentialsId: 'basedynamics',
-            sha: env.GIT_COMMIT
-        )
+      withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
+        sh '''
+        curl -s -o /dev/null -w "%{http_code}" \
+        -H "Authorization: token $TOKEN" \
+        -H "Content-Type: application/json" \
+        -X POST \
+        https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/${GIT_COMMIT} \
+        -d '{
+          "state": "success",
+          "context": "CI/CD",
+          "description": "Build passed",
+          "target_url": "'${BUILD_URL}'"
+        }'
+        '''
+      }
     }
     failure {
-        githubNotify(
-            context: 'CI/CD',
-            status: 'FAILURE',
-            description: 'Build failed',
-            targetUrl: env.BUILD_URL,
-            repo: 'Alphonsa-senti/todo-chart',
-            credentialsId: 'basedynamics',
-            sha: env.GIT_COMMIT
-        )
+      withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
+        sh '''
+        curl -s -o /dev/null -w "%{http_code}" \
+        -H "Authorization: token $TOKEN" \
+        -H "Content-Type: application/json" \
+        -X POST \
+        https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/${GIT_COMMIT} \
+        -d '{
+          "state": "failure",
+          "context": "CI/CD",
+          "description": "Build failed",
+          "target_url": "'${BUILD_URL}'"
+        }'
+        '''
+      }
     }
   }
+  
 }
