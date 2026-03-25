@@ -49,7 +49,7 @@ pipeline {
 
     stage('Debug Credentials') {
       steps {
-        withCredentials([string(credentialsId: 'basedynamics', variable: 'TOKEN')]) {
+        withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
           sh 'echo "Token loaded successfully"'
         }
       }
