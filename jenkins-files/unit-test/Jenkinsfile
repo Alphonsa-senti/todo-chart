@@ -11,17 +11,18 @@ pipeline {
 
     stage('Checkout') {
       steps {
-        script {
-          def branchToBuild = env.source_branch ?: 'main'
-          checkout([
-            $class: 'GitSCM',
-            branches: [[name: "*/${branchToBuild}"]],
-            userRemoteConfigs: [[
-              url: 'https://github.com/Alphonsa-senti/todo-chart.git',
-              credentialsId: 'basedynamics'
-            ]]
-          ])
-        }
+        checkout scm
+        // script {
+        //   def branchToBuild = env.source_branch ?: 'main'
+        //   checkout([
+        //     $class: 'GitSCM',
+        //     branches: [[name: "*/${branchToBuild}"]],
+        //     userRemoteConfigs: [[
+        //       url: 'https://github.com/Alphonsa-senti/todo-chart.git',
+        //       credentialsId: 'basedynamics'
+        //     ]]
+        //   ])
+        // }
       }
     }
 
