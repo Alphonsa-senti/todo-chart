@@ -59,28 +59,39 @@ pipeline {
 
   post {
     success {
-      githubNotify(
-        context: 'CI/CD',
-        status: 'SUCCESS',
-        description: 'Build passed',
-        targetUrl: env.BUILD_URL,
-        repo: 'todo-chart',
-        account: 'Alphonsa-senti',
-        credentialsId: 'git-cred',
-        sha: env.GIT_COMMIT
-      )
+      withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
+        sh '''
+        curl -s -o /dev/null -w "%{http_code}" \
+        -H "Authorization: token $TOKEN" \
+        -H "Content-Type: application/json" \
+        -X POST \
+        https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/${GIT_COMMIT} \
+        -d '{
+          "state": "success",
+          "context": "CI/CD",
+          "description": "Build passed",
+          "target_url": "'${BUILD_URL}'"
+        }'
+        '''
+      }
     }
     failure {
-      githubNotify(
-        context: 'CI/CD',
-        status: 'FAILURE',
-        description: 'Build failed',
-        targetUrl: env.BUILD_URL,
-        repo: 'todo-chart',
-        account: 'Alphonsa-senti',
-        credentialsId: 'git-cred',
-        sha: env.GIT_COMMIT
-      )
+      withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
+        sh '''
+        curl -s -o /dev/null -w "%{http_code}" \
+        -H "Authorization: token $TOKEN" \
+        -H "Content-Type: application/json" \
+        -X POST \
+        https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/${GIT_COMMIT} \
+        -d '{
+          "state": "failure",
+          "context": "CI/CD",
+          "description": "Build failed",
+          "target_url": "'${BUILD_URL}'"
+        }'
+        '''
+      }
     }
   }
+  
 }
