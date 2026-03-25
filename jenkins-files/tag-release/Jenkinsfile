@@ -1,28 +1,38 @@
-def K8S_REPO_BRANCH = 'main'
+def K8S_REPO_BRANCH = params.BRANCH
 def K8S_DEPLOY_VALUE_FILE = "./charts/values.yaml"
-def ENV = 'main'
-def NOW = new Date().format("dd-MM-yyyy-HH-mm-ss", TimeZone.getTimeZone('UTC'))
+def ENV = 'staging'
+def NOW = new Date().format("yyyyMMdd-HHmmss", TimeZone.getTimeZone('UTC'))
 
 pipeline {
   agent any
 
   stages {
 
-    stage('Build Docker Image') {
-      when {
-        expression { return env.RELEASE_TAG?.trim() }
+    stage('Determine Release Type') {
+      steps {
+        script {
+          def branch = K8S_REPO_BRANCH.replaceAll('/', '_').toLowerCase()
+          def releaseType = branch.contains('fix') ? 'hotfix' : 'release'
+          env.RELEASE_TYPE = releaseType
+          echo "Branch: ${branch}"
+          echo "Release type: ${env.RELEASE_TYPE}"
+        }
       }
+    }
+
+    stage('Build Docker Image') {
       steps {
         sshagent(credentials: ['basedynamics']) {
           script {
-            def tag = "${ENV}-${NOW}"
-            sh """
+            def tag = "${ENV}-${env.RELEASE_TYPE}-${NOW}"
+            echo "Docker Image Tag: ${tag}"
 
-            git checkout ${K8S_REPO_BRANCH} && git pull origin ${K8S_REPO_BRANCH} --no-rebase
-            sed -i "s/^\\(\\s*tag:\\s*\\).*/\\1${tag}/" ${K8S_DEPLOY_VALUE_FILE}
-            git add ${K8S_DEPLOY_VALUE_FILE}
-            git commit -m "Latest Docker Image Tag Update: ${tag}"
-            git push origin ${K8S_REPO_BRANCH}
+            sh """
+              git checkout ${K8S_REPO_BRANCH} && git pull origin ${K8S_REPO_BRANCH} --no-rebase
+              sed -i "s/^\\(\\s*tag:\\s*\\).*/\\1${tag}/" ${K8S_DEPLOY_VALUE_FILE}
+              git add ${K8S_DEPLOY_VALUE_FILE}
+              git commit -m "Latest Docker Image Tag Update: ${tag}" || echo "No changes to commit"
+              git push origin ${K8S_REPO_BRANCH}
             """
           }
         }
@@ -33,10 +43,8 @@ pipeline {
       steps {
         sshagent(credentials: ['basedynamics']) {
           script {
-            def tag = "${ENV}-${NOW}"
+            def tag = "${ENV}-${env.RELEASE_TYPE}-${NOW}"
             sh """
-              
-              # Check if tag already exists
               if git rev-parse "${tag}" >/dev/null 2>&1; then
                 echo "Tag ${tag} already exists, skipping"
               else
@@ -48,7 +56,6 @@ pipeline {
         }
       }
     }
-  
+
   }
 }
-
