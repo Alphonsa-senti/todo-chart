@@ -48,6 +48,14 @@ pipeline {
     }
   }
 
+  stage('Debug Credentials') {
+    steps {
+      withCredentials([string(credentialsId: 'basedynamics', variable: 'TOKEN')]) {
+        sh 'echo "Token loaded successfully"'
+      }
+    }
+  }
+
   post {
     success {
       githubNotify(
