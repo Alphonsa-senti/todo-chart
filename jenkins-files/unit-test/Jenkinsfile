@@ -86,9 +86,8 @@ pipeline {
             status: 'SUCCESS',
             description: 'Build passed',
             targetUrl: env.BUILD_URL,
-            repo: 'BaseDynamics/sentral-id',
+            repo: 'Alphonsa-senti/todo-chart',
             credentialsId: 'basedynamics',
-            account: 'BaseDynamics',
             sha: env.GIT_COMMIT
         )
     }
@@ -98,9 +97,8 @@ pipeline {
             status: 'FAILURE',
             description: 'Build failed',
             targetUrl: env.BUILD_URL,
-            repo: 'BaseDynamics/sentral-id',
+            repo: 'Alphonsa-senti/todo-chart',
             credentialsId: 'basedynamics',
-            account: 'BaseDynamics',
             sha: env.GIT_COMMIT
         )
     }
