@@ -11,8 +11,17 @@ pipeline {
 
     stage('Checkout') {
       steps {
-        // sh """git checkout ${BRANCH} && git pull origin ${BRANCH} --no-rebase"""
-        checkout scm
+        script {
+          def branchToBuild = env.source_branch ?: 'main'
+          checkout([
+            $class: 'GitSCM',
+            branches: [[name: "*/${branchToBuild}"]],
+            userRemoteConfigs: [[
+              url: 'https://github.com/Alphonsa-senti/todo-chart.git',
+              credentialsId: 'basedynamics'
+            ]]
+          ])
+        }
       }
     }
 
@@ -41,26 +50,28 @@ pipeline {
 
   post {
     success {
-        githubNotify(
-            context: 'CI/CD',
-            status: 'SUCCESS',
-            description: 'Build passed',
-            targetUrl: env.BUILD_URL,
-            repo: 'Alphonsa-senti/todo-chart',
-            credentialsId: 'basedynamics',
-            sha: env.GIT_COMMIT
-        )
+      githubNotify(
+        context: 'CI/CD',
+        status: 'SUCCESS',
+        description: 'Build passed',
+        targetUrl: env.BUILD_URL,
+        repo: 'todo-chart',
+        account: 'Alphonsa-senti',
+        credentialsId: 'basedynamics',
+        sha: env.GIT_COMMIT
+      )
     }
     failure {
-        githubNotify(
-            context: 'CI/CD',
-            status: 'FAILURE',
-            description: 'Build failed',
-            targetUrl: env.BUILD_URL,
-            repo: 'Alphonsa-senti/todo-chart',
-            credentialsId: 'basedynamics',
-            sha: env.GIT_COMMIT
-        )
+      githubNotify(
+        context: 'CI/CD',
+        status: 'FAILURE',
+        description: 'Build failed',
+        targetUrl: env.BUILD_URL,
+        repo: 'todo-chart',
+        account: 'Alphonsa-senti',
+        credentialsId: 'basedynamics',
+        sha: env.GIT_COMMIT
+      )
     }
   }
 }
