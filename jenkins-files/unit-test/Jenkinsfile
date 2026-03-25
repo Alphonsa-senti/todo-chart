@@ -16,26 +16,10 @@ pipeline {
       }
     }
 
-    stage('Compile') {
-      steps {
-        dir('.') {
-        sh 'mvn clean compile'
-        }
-      }
-    }
-
     stage('Unit Tests') {
         steps {
             dir('.') {
                 sh 'mvn test'
-                sh 'echo "Current dir: $(pwd)"'
-                sh 'ls -l target/'
-                sh 'ls -l target/surefire-reports/'
-            }
-        }
-        post {
-            always {
-                junit 'target/surefire-reports/*.xml'
             }
         }
     }
@@ -44,12 +28,6 @@ pipeline {
         steps {
             dir('.') {
             sh 'mvn verify -DskipUnitTests=true'
-            sh 'ls -l target/failsafe-reports/' 
-            }
-        }
-        post {
-            always {
-            junit 'target/failsafe-reports/*.xml'
             }
         }
     }
@@ -58,24 +36,6 @@ pipeline {
         steps {
             sh 'mvn clean test jacoco:report'
         }
-        post {
-            always {
-            publishHTML([
-                reportDir: 'target/site/jacoco',
-                reportFiles: 'index.html',
-                reportName: 'JaCoCo Coverage Report',
-                keepAll: true,
-                alwaysLinkToLastBuild: true,
-                allowMissing: true
-            ])
-            }
-        }
-    }
-
-    stage('Package') {
-      steps {
-        sh 'mvn package -DskipTests'
-      }
     }
   }
 
