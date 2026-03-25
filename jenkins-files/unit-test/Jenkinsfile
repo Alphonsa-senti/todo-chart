@@ -11,8 +11,8 @@ pipeline {
 
     stage('Checkout') {
       steps {
-        sh """git checkout ${BRANCH} && git pull origin ${BRANCH} --no-rebase"""
-        // checkout scm
+        // sh """git checkout ${BRANCH} && git pull origin ${BRANCH} --no-rebase"""
+        checkout scm
       }
     }
 
