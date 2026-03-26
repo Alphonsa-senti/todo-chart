@@ -100,9 +100,9 @@ pipeline {
         -X POST \
         https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/'"$GIT_COMMIT"' \
         -d '{
-          "state": "'$STATE'",
+          "state": "$STATE",
           "context": "CI/CD",
-          "description": "'$SUMMARY'",
+          "description": "$SUMMARY",
           "target_url": "'$BUILD_URL'console"
         }'
         '''
