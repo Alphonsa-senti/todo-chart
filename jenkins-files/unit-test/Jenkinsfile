@@ -128,26 +128,30 @@ pipeline {
       junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
       
       script {
-        // Look for reports, but if the directory doesn't exist, this returns 0
-        def totalStr = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml 2>/dev/null | sed -n 's/.*tests=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
-        def failStr  = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml 2>/dev/null | sed -n 's/.*failures=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
-        def errStr   = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml 2>/dev/null | sed -n 's/.*errors=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
-        def skipStr  = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml 2>/dev/null | sed -n 's/.*skipped=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+        // Check if the directory exists before grepping
+        def reportDir = "target/surefire-reports"
+        def dirExists = sh(script: "[ -d ${reportDir} ] && echo 'true' || echo 'false'", returnStdout: true).trim()
 
-        int total = totalStr.toInteger()
-        int failed = failStr.toInteger() + errStr.toInteger()
-        int skipped = skipStr.toInteger()
-        int passed = total - failed - skipped
-        
-        def summary = "Tests: ${total} (Passed: ${passed}, Failed: ${failed}, Skipped: ${skipped})"
-        
-        // CRITICAL FIX: If the build result is not SUCCESS, the GitHub state should be 'failure'
-        // even if the test parser (mistakenly) finds 0 failures.
-        def state = (currentBuild.result == 'SUCCESS' && total > 0) ? "success" : "failure"
-        
-        // If the build failed before tests could even run (like your POM error)
-        if (total == 0 && currentBuild.result != 'SUCCESS') {
-            summary = "Build failed during compilation or setup."
+        def summary = "Build failed before tests could run."
+        def state = "failure"
+
+        if (dirExists == 'true') {
+            def totalStr = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml 2>/dev/null | sed -n 's/.*tests=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+            def failStr  = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml 2>/dev/null | sed -n 's/.*failures=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+            def errStr   = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml 2>/dev/null | sed -n 's/.*errors=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+            def skipStr  = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml 2>/dev/null | sed -n 's/.*skipped=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+
+            int total = totalStr.toInteger()
+            int failed = failStr.toInteger() + errStr.toInteger()
+            int skipped = skipStr.toInteger()
+            int passed = total - failed - skipped
+            
+            summary = "Tests: ${total} (Passed: ${passed}, Failed: ${failed}, Skipped: ${skipped})"
+            
+            // Only 'success' if the build passed AND there are no test failures
+            if (currentBuild.result == 'SUCCESS' && failed == 0 && total > 0) {
+                state = "success"
+            }
         }
 
         withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
