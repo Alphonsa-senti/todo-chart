@@ -1,5 +1,94 @@
 def BRANCH = "${env.source_branch ?: 'main'}"
 
+// pipeline {
+//   agent any
+
+//   tools {
+//     maven 'Maven 3.9.11'
+//   }
+
+//   stages {
+
+//     stage('Checkout') {
+//       steps {
+//         checkout scm
+//         // script {
+//         //   def branchToBuild = env.source_branch ?: 'main'
+//         //   checkout([
+//         //     $class: 'GitSCM',
+//         //     branches: [[name: "*/${branchToBuild}"]],
+//         //     userRemoteConfigs: [[
+//         //       url: 'https://github.com/Alphonsa-senti/todo-chart.git',
+//         //       credentialsId: 'basedynamics'
+//         //     ]]
+//         //   ])
+//         // }
+//       }
+//     }
+
+//     stage('Unit Tests') {
+//         steps {
+//             dir('.') {
+//                 sh 'mvn test'
+//             }
+//         }
+//     }
+
+//     stage('Integration Tests') {
+//         steps {
+//             dir('.') {
+//             sh 'mvn verify -DskipUnitTests=true'
+//             }
+//         }
+//     }
+
+//     stage('Code Coverage') {
+//         steps {
+//             sh 'mvn clean test jacoco:report'
+//         }
+//     }
+//   }
+
+
+//   post {
+//     success {
+//       withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
+//         sh '''
+//         curl -s -o /dev/null -w "%{http_code}" \
+//         -H "Authorization: token $TOKEN" \
+//         -H "Content-Type: application/json" \
+//         -X POST \
+//         https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/${GIT_COMMIT} \
+//         -d '{
+//           "state": "success",
+//           "context": "CI/CD",
+//           "description": "Build passed",
+//           "target_url": "'${BUILD_URL}'"
+//         }'
+//         '''
+//       }
+//     }
+//     failure {
+//       withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
+//         sh '''
+//         curl -s -o /dev/null -w "%{http_code}" \
+//         -H "Authorization: token $TOKEN" \
+//         -H "Content-Type: application/json" \
+//         -X POST \
+//         https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/${GIT_COMMIT} \
+//         -d '{
+//           "state": "failure",
+//           "context": "CI/CD",
+//           "description": "Build failed",
+//           "target_url": "'${BUILD_URL}'"
+//         }'
+//         '''
+//       }
+//     }
+//   }
+  
+// }
+
 pipeline {
   agent any
 
@@ -8,83 +97,70 @@ pipeline {
   }
 
   stages {
-
     stage('Checkout') {
       steps {
         checkout scm
-        // script {
-        //   def branchToBuild = env.source_branch ?: 'main'
-        //   checkout([
-        //     $class: 'GitSCM',
-        //     branches: [[name: "*/${branchToBuild}"]],
-        //     userRemoteConfigs: [[
-        //       url: 'https://github.com/Alphonsa-senti/todo-chart.git',
-        //       credentialsId: 'basedynamics'
-        //     ]]
-        //   ])
-        // }
       }
     }
 
     stage('Unit Tests') {
-        steps {
-            dir('.') {
-                sh 'mvn test'
-            }
-        }
+      steps {
+        // Continue even on failure so we can report the summary
+        sh 'mvn test -Dmaven.test.failure.ignore=true'
+      }
     }
 
     stage('Integration Tests') {
-        steps {
-            dir('.') {
-            sh 'mvn verify -DskipUnitTests=true'
-            }
-        }
+      steps {
+        sh 'mvn verify -DskipUnitTests=true -Dmaven.test.failure.ignore=true'
+      }
     }
 
     stage('Code Coverage') {
-        steps {
-            sh 'mvn clean test jacoco:report'
-        }
+      steps {
+        sh 'mvn jacoco:report'
+      }
     }
   }
-
 
   post {
-    success {
-      withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
-        sh '''
-        curl -s -o /dev/null -w "%{http_code}" \
-        -H "Authorization: token $TOKEN" \
-        -H "Content-Type: application/json" \
-        -X POST \
-        https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/${GIT_COMMIT} \
-        -d '{
-          "state": "success",
-          "context": "CI/CD",
-          "description": "Build passed",
-          "target_url": "'${BUILD_URL}'"
-        }'
-        '''
-      }
-    }
-    failure {
-      withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
-        sh '''
-        curl -s -o /dev/null -w "%{http_code}" \
-        -H "Authorization: token $TOKEN" \
-        -H "Content-Type: application/json" \
-        -X POST \
-        https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/${GIT_COMMIT} \
-        -d '{
-          "state": "failure",
-          "context": "CI/CD",
-          "description": "Build failed",
-          "target_url": "'${BUILD_URL}'"
-        }'
-        '''
+    always {
+      // Record results for the Jenkins UI
+      junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
+      
+      script {
+        // 1. Extract counts using shell (no emojis, just numbers)
+        def totalStr = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml | sed -n 's/.*tests=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+        def failStr = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml | sed -n 's/.*failures=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+        def errStr = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml | sed -n 's/.*errors=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+        def skipStr = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml | sed -n 's/.*skipped=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+
+        // 2. Convert to Integers for calculation
+        int total = totalStr.toInteger()
+        int failed = failStr.toInteger() + errStr.toInteger()
+        int skipped = skipStr.toInteger()
+        int passed = total - failed - skipped
+        
+        // 3. Create the plain text summary
+        def summary = "Tests: ${total} (Passed: ${passed}, Failed: ${failed}, Skipped: ${skipped})"
+        def state = (failed == 0 && total > 0) ? "success" : "failure"
+
+        // 4. Send to GitHub
+        withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
+          sh """
+          curl -s -H "Authorization: token \$TOKEN" \
+          -H "Content-Type: application/json" \
+          -X POST \
+          https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/${GIT_COMMIT} \
+          -d '{
+            "state": "${state}",
+            "context": "CI/CD / Unit Tests",
+            "description": "${summary}",
+            "target_url": "${BUILD_URL}"
+          }'
+          """
+        }
       }
     }
   }
-  
 }
