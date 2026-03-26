@@ -105,7 +105,8 @@ pipeline {
 
     stage('Unit Tests') {
       steps {
-        // -Dmaven.test.failure.ignore=true ensures we reach the report stage even if tests fail
+        // We use -Dmaven.test.failure.ignore=true so the pipeline continues 
+        // to the report stage even if tests fail.
         sh 'mvn test -Dmaven.test.failure.ignore=true'
       }
     }
@@ -125,28 +126,25 @@ pipeline {
 
   post {
     always {
-      // 1. Record results so Jenkins can count them
+      // Record results so Jenkins populates currentBuild.testCounts
       junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
       
       script {
-        // 2. Extract counts from the Jenkins test action
-        def testResult = currentBuild.rawBuild.getAction(hudson.tasks.test.AbstractTestResultAction.class)
-        def summary = "No tests found"
-        def state = "failure" // Default to failure unless proven otherwise
-
-        if (testResult != null) {
-          int total = testResult.totalCount
-          int failed = testResult.failCount
-          int skipped = testResult.skipCount
-          int passed = total - failed - skipped
-          
-          summary = "Tests: ${total} (✔${passed}, ✘${failed}, ↷${skipped})"
-          
-          // Determine status based on failures
-          state = (failed == 0 && total > 0) ? "success" : "failure"
+        // Use sandbox-friendly currentBuild properties
+        def total = currentBuild.totalTestCount ?: 0
+        def failed = currentBuild.failTestCount ?: 0
+        def skipped = currentBuild.skipTestCount ?: 0
+        def passed = total - failed - skipped
+        
+        def summary = "Tests: ${total} (✔${passed}, ✘${failed}, ↷${skipped})"
+        def state = (failed == 0 && total > 0) ? "success" : "failure"
+        
+        // If no tests were run at all, we should probably know
+        if (total == 0) {
+            summary = "No tests were executed."
+            state = "failure" 
         }
 
-        // 3. Send the API request to GitHub
         withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
           sh """
           curl -s -H "Authorization: token $TOKEN" \
