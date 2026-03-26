@@ -46,7 +46,7 @@ pipeline {
 
     stage('Code Coverage') {
       steps {
-        sh 'mvn clean test jacoco:report'
+        sh 'mvn jacoco:report'
       }
     }
 
