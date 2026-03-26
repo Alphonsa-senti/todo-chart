@@ -13,7 +13,7 @@
     <!-- Dependencies -->
     <dependencies>
         <dependency>
-            <groupId>org.junit.jupiter</groupId>
+            <!-- <groupId>org.junit.jupiter</groupId> -->
             <artifactId>junit-jupiter</artifactId>
             <version>5.9.3</version>
             <scope>test</scope>
@@ -32,7 +32,7 @@
             </plugin>
 
             <!-- JaCoCo (FIXED) -->
-            <!-- <plugin> -->
+            <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>0.8.11</version>
