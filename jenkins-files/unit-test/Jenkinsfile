@@ -28,7 +28,7 @@ pipeline {
       }
       post {
         always {
-          junit 'target/surefire-reports/*.xml'
+          junit allowEmptyResults: true, testResults: 'target/surefire-reports/*.xml'
         }
       }
     }
@@ -39,7 +39,7 @@ pipeline {
       }
       post {
         always {
-          junit 'target/failsafe-reports/*.xml'
+          junit allowEmptyResults: true, testResults: 'target/failsafe-reports/*.xml'
         }
       }
     }
@@ -78,7 +78,7 @@ pipeline {
 
     success {
       script {
-        def summary = "✔ ${env.TEST_PASS} | ✖ ${env.TEST_FAIL} | ⚠ ${env.TEST_SKIP}"
+        env.SUMMARY = "Pass:${env.TEST_PASS} Fail:${env.TEST_FAIL} Skip:${env.TEST_SKIP}"
         
         withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
           sh '''
@@ -90,7 +90,7 @@ pipeline {
           -d '{
             "state": "success",
             "context": "CI/CD",
-            "description": "Tests: ${summary}",
+            "description": "'$SUMMARY'",
             "target_url": "${BUILD_URL}"
           }'
           '''
@@ -112,7 +112,7 @@ pipeline {
           -d '{
             "state": "failure",
             "context": "CI/CD",
-            "description": "Tests: ${summary}",
+            "description": "'$SUMMARY'",
             "target_url": "${BUILD_URL}"
           }'
           '''
