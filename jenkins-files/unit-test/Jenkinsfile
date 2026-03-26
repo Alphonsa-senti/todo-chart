@@ -80,8 +80,8 @@ pipeline {
         -d '{
           "state": "$STATE",
           "context": "CI/CD",
-          "description": "$SUMMARY",
-          "target_url": "'$BUILD_URL'console"
+          "description": "'${SUMMARY}'",
+          "target_url": "'${BUILD_URL}'"
         }'
         '''
       }
@@ -102,8 +102,8 @@ pipeline {
         -d '{
           "state": "$STATE",
           "context": "CI/CD",
-          "description": "$SUMMARY",
-          "target_url": "'$BUILD_URL'console"
+          "description": "'${SUMMARY}'",
+          "target_url": "'${BUILD_URL}'"
         }'
         '''
       }
