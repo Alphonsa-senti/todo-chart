@@ -104,53 +104,49 @@ pipeline {
     }
 
     stage('Unit Tests') {
-        steps {
-            // Use -Dmaven.test.failure.ignore=true if you want the pipeline 
-            // to continue to the "Code Coverage" stage even if tests fail
-            sh 'mvn test'
-        }
+      steps {
+        // -Dmaven.test.failure.ignore=true ensures we reach the report stage even if tests fail
+        sh 'mvn test -Dmaven.test.failure.ignore=true'
+      }
     }
 
     stage('Integration Tests') {
-        steps {
-            sh 'mvn verify -DskipUnitTests=true'
-        }
+      steps {
+        sh 'mvn verify -DskipUnitTests=true -Dmaven.test.failure.ignore=true'
+      }
     }
 
     stage('Code Coverage') {
-        steps {
-            sh 'mvn jacoco:report'
-        }
+      steps {
+        sh 'mvn jacoco:report'
+      }
     }
   }
 
   post {
     always {
-        // This parses the JUnit XML files so Jenkins knows the counts
-        junit '**/target/surefire-reports/*.xml'
-    }
-    
-    // We use 'always' or 'unsuccessful' to ensure the status is sent 
-    // regardless of the test outcome.
-    fixed { } // placeholder
-    
-    regression { } // placeholder
-
-    cleanup {
+      // 1. Record results so Jenkins can count them
+      junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
+      
       script {
+        // 2. Extract counts from the Jenkins test action
         def testResult = currentBuild.rawBuild.getAction(hudson.tasks.test.AbstractTestResultAction.class)
         def summary = "No tests found"
-        
+        def state = "failure" // Default to failure unless proven otherwise
+
         if (testResult != null) {
-            def total = testResult.totalCount
-            def failed = testResult.failCount
-            def skipped = testResult.skipCount
-            def passed = total - failed - skipped
-            summary = "Tests: ${total} (✔${passed}, ✘${failed}, ↷${skipped})"
+          int total = testResult.totalCount
+          int failed = testResult.failCount
+          int skipped = testResult.skipCount
+          int passed = total - failed - skipped
+          
+          summary = "Tests: ${total} (✔${passed}, ✘${failed}, ↷${skipped})"
+          
+          // Determine status based on failures
+          state = (failed == 0 && total > 0) ? "success" : "failure"
         }
 
-        def status = currentBuild.result == 'SUCCESS' ? 'success' : 'failure'
-        
+        // 3. Send the API request to GitHub
         withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
           sh """
           curl -s -H "Authorization: token $TOKEN" \
@@ -158,7 +154,7 @@ pipeline {
           -X POST \
           https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/${GIT_COMMIT} \
           -d '{
-            "state": "${status}",
+            "state": "${state}",
             "context": "CI/CD / Tests",
             "description": "${summary}",
             "target_url": "${BUILD_URL}"
