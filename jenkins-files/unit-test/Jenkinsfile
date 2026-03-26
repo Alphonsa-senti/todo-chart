@@ -99,10 +99,9 @@ pipeline {
   stages {
     stage('Checkout') {
       steps {
-        deleteDir()
         checkout scm
 
-        sh 'mvn clean'
+        sh 'rm -rf target'
       }
     }
 
