@@ -125,27 +125,31 @@ pipeline {
 
   post {
     always {
-      // Record results for the Jenkins UI
       junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
       
       script {
-        // 1. Extract counts using shell (no emojis, just numbers)
-        def totalStr = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml | sed -n 's/.*tests=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
-        def failStr = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml | sed -n 's/.*failures=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
-        def errStr = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml | sed -n 's/.*errors=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
-        def skipStr = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml | sed -n 's/.*skipped=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+        // Look for reports, but if the directory doesn't exist, this returns 0
+        def totalStr = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml 2>/dev/null | sed -n 's/.*tests=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+        def failStr  = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml 2>/dev/null | sed -n 's/.*failures=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+        def errStr   = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml 2>/dev/null | sed -n 's/.*errors=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+        def skipStr  = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml 2>/dev/null | sed -n 's/.*skipped=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
 
-        // 2. Convert to Integers for calculation
         int total = totalStr.toInteger()
         int failed = failStr.toInteger() + errStr.toInteger()
         int skipped = skipStr.toInteger()
         int passed = total - failed - skipped
         
-        // 3. Create the plain text summary
         def summary = "Tests: ${total} (Passed: ${passed}, Failed: ${failed}, Skipped: ${skipped})"
-        def state = (failed == 0 && total > 0) ? "success" : "failure"
+        
+        // CRITICAL FIX: If the build result is not SUCCESS, the GitHub state should be 'failure'
+        // even if the test parser (mistakenly) finds 0 failures.
+        def state = (currentBuild.result == 'SUCCESS' && total > 0) ? "success" : "failure"
+        
+        // If the build failed before tests could even run (like your POM error)
+        if (total == 0 && currentBuild.result != 'SUCCESS') {
+            summary = "Build failed during compilation or setup."
+        }
 
-        // 4. Send to GitHub
         withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
           sh """
           curl -s -H "Authorization: token \$TOKEN" \
