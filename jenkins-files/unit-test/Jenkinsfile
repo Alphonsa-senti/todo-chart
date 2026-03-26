@@ -7,108 +7,84 @@ pipeline {
     maven 'Maven 3.9.11'
   }
 
-  environment {
-    SUMMARY = ''
-    STATE   = ''
-  }
-
   stages {
 
     stage('Checkout') {
       steps {
         checkout scm
-        script {
-          env.GIT_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
-        }
+        // script {
+        //   def branchToBuild = env.source_branch ?: 'main'
+        //   checkout([
+        //     $class: 'GitSCM',
+        //     branches: [[name: "*/${branchToBuild}"]],
+        //     userRemoteConfigs: [[
+        //       url: 'https://github.com/Alphonsa-senti/todo-chart.git',
+        //       credentialsId: 'basedynamics'
+        //     ]]
+        //   ])
+        // }
       }
     }
 
-    stage('Run Tests & Capture Output') {
-      steps {
-        script {
-          def output = sh(
-            script: 'mvn test',
-            returnStdout: true
-          )
-
-          echo output
-
-          // Extract test summary safely
-          def matcher = output =~ /Tests run: (\d+), Failures: (\d+), Errors: (\d+), Skipped: (\d+)/
-
-          if (matcher) {
-            def total = matcher[0][1].toInteger()
-            def fail  = matcher[0][2].toInteger()
-            def error = matcher[0][3].toInteger()
-            def skip  = matcher[0][4].toInteger()
-            def pass  = total - fail - error
-
-            env.SUMMARY = "Pass:${pass} Fail:${fail + error} Skip:${skip}"
-          } else {
-            env.SUMMARY = "No tests found"
-          }
-
-          echo "SUMMARY: ${env.SUMMARY}"
+    stage('Unit Tests') {
+        steps {
+            dir('.') {
+                sh 'mvn test'
+            }
         }
-      }
     }
 
     stage('Integration Tests') {
-      steps {
-        sh 'mvn verify -DskipUnitTests=true'
-      }
+        steps {
+            dir('.') {
+            sh 'mvn verify -DskipUnitTests=true'
+            }
+        }
     }
 
     stage('Code Coverage') {
-      steps {
-        sh 'mvn jacoco:report'
-      }
+        steps {
+            sh 'mvn clean test jacoco:report'
+        }
     }
   }
+
 
   post {
     success {
-        script {
-            env.STATE = "success"
-            env.SUMMARY = "Build passed"
-        }
-        withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
-            sh """
-            curl -s -o /dev/null -w "%{http_code}" \\
-            -H "Authorization: token $TOKEN" \\
-            -H "Content-Type: application/json" \\
-            -X POST \\
-            https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/$GIT_COMMIT \\
-            -d '{
-              "state": "$env.STATE",
-              "context": "CI/CD",
-              "description": "$env.SUMMARY",
-              "target_url": "$BUILD_URL"
-            }'
-            """
-        }
+      withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
+        sh '''
+        curl -s -o /dev/null -w "%{http_code}" \
+        -H "Authorization: token $TOKEN" \
+        -H "Content-Type: application/json" \
+        -X POST \
+        https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/${GIT_COMMIT} \
+        -d '{
+          "state": "success",
+          "context": "CI/CD",
+          "description": "Build passed",
+          "target_url": "'${BUILD_URL}'"
+        }'
+        '''
+      }
     }
-
     failure {
-        script {
-            env.STATE = "failure"
-            env.SUMMARY = "Build failed"
-        }
-        withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
-            sh """
-            curl -s -o /dev/null -w "%{http_code}" \\
-            -H "Authorization: token $TOKEN" \\
-            -H "Content-Type: application/json" \\
-            -X POST \\
-            https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/$GIT_COMMIT \\
-            -d '{
-              "state": "$env.STATE",
-              "context": "CI/CD",
-              "description": "$env.SUMMARY",
-              "target_url": "$BUILD_URL"
-            }'
-            """
-        }
+      withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
+        sh '''
+        curl -s -o /dev/null -w "%{http_code}" \
+        -H "Authorization: token $TOKEN" \
+        -H "Content-Type: application/json" \
+        -X POST \
+        https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/${GIT_COMMIT} \
+        -d '{
+          "state": "failure",
+          "context": "CI/CD",
+          "description": "Build failed",
+          "target_url": "'${BUILD_URL}'"
+        }'
+        '''
+      }
     }
   }
+  
 }
