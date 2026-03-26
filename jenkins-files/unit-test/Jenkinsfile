@@ -125,24 +125,27 @@ pipeline {
 
   post {
     always {
-      // Still record them so they show up in the Jenkins UI
+      // Record results for the Jenkins UI
       junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
       
       script {
-        // 1. Extract counts using shell commands to avoid Sandbox/Property issues
-        def total = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml | sed -n 's/.*tests=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print s}'", returnStdout: true).trim() ?: "0"
-        def failed = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml | sed -n 's/.*failures=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print s}'", returnStdout: true).trim() ?: "0"
-        def errors = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml | sed -n 's/.*errors=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print s}'", returnStdout: true).trim() ?: "0"
-        def skipped = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml | sed -n 's/.*skipped=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print s}'", returnStdout: true).trim() ?: "0"
+        // 1. Extract counts using shell (no emojis, just numbers)
+        def totalStr = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml | sed -n 's/.*tests=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+        def failStr = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml | sed -n 's/.*failures=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+        def errStr = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml | sed -n 's/.*errors=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+        def skipStr = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml | sed -n 's/.*skipped=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
 
-        // 2. Calculate totals
-        int failCount = (failed.toInteger() + errors.toInteger())
-        int passCount = total.toInteger() - failCount - skipped.toInteger()
+        // 2. Convert to Integers for calculation
+        int total = totalStr.toInteger()
+        int failed = failStr.toInteger() + errStr.toInteger()
+        int skipped = skipStr.toInteger()
+        int passed = total - failed - skipped
         
-        def summary = "Tests: ${total} (✔${passCount}, ✘${failCount}, ↷${skipped})"
-        def state = (failCount == 0 && total.toInteger() > 0) ? "success" : "failure"
+        // 3. Create the plain text summary
+        def summary = "Tests: ${total} (Passed: ${passed}, Failed: ${failed}, Skipped: ${skipped})"
+        def state = (failed == 0 && total > 0) ? "success" : "failure"
 
-        // 3. Post to GitHub
+        // 4. Send to GitHub
         withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
           sh """
           curl -s -H "Authorization: token \$TOKEN" \
