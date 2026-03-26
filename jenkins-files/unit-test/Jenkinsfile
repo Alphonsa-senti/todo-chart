@@ -64,45 +64,35 @@ pipeline {
   }
 
   post {
-
     success {
-      script {
-        env.STATE = "success"
-      }
-
-      withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
+      withCredentials([string(credentialsId: 'git-repo-status-token', variable: 'TOKEN')]) {
         sh '''
         curl -s -o /dev/null -w "%{http_code}" \
-        -H "Authorization: token '"$TOKEN"'" \
+        -H "Authorization: token $TOKEN" \
         -H "Content-Type: application/json" \
         -X POST \
-        https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/'"$GIT_COMMIT"' \
+        https://api.github.com/repos/BaseDynamics/sentral-id/statuses/${GIT_COMMIT} \
         -d '{
-          "state": "$STATE",
+          "state": "success",
           "context": "CI/CD",
-          "description": "'${SUMMARY}'",
+          "description": "Build passed",
           "target_url": "'${BUILD_URL}'"
         }'
         '''
       }
     }
-
     failure {
-      script {
-        env.STATE = "failure"
-      }
-
-      withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
+      withCredentials([string(credentialsId: 'git-repo-status-token', variable: 'TOKEN')]) {
         sh '''
         curl -s -o /dev/null -w "%{http_code}" \
-        -H "Authorization: token '"$TOKEN"'" \
+        -H "Authorization: token $TOKEN" \
         -H "Content-Type: application/json" \
         -X POST \
-        https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/'"$GIT_COMMIT"' \
+        https://api.github.com/repos/BaseDynamics/sentral-id/statuses/${GIT_COMMIT} \
         -d '{
-          "state": "$STATE",
+          "state": "failure",
           "context": "CI/CD",
-          "description": "'${SUMMARY}'",
+          "description": "Build failed",
           "target_url": "'${BUILD_URL}'"
         }'
         '''
