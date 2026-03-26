@@ -159,7 +159,7 @@ pipeline {
         }
 
         // 3. Send the API request to GitHub
-        withCredentials([string(credentialsId: 'git-repo-status-token', variable: 'TOKEN')]) {
+        withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
           sh """
           curl -s -H "Authorization: token \$TOKEN" \
           -H "Content-Type: application/json" \
