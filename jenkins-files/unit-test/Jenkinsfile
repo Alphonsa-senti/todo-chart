@@ -105,8 +105,7 @@ pipeline {
 
     stage('Unit Tests') {
       steps {
-        // We use -Dmaven.test.failure.ignore=true so the pipeline continues 
-        // to the report stage even if tests fail.
+        // Continue even on failure so we can report the summary
         sh 'mvn test -Dmaven.test.failure.ignore=true'
       }
     }
@@ -126,34 +125,33 @@ pipeline {
 
   post {
     always {
-      // Record results so Jenkins populates currentBuild.testCounts
+      // Still record them so they show up in the Jenkins UI
       junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
       
       script {
-        // Use sandbox-friendly currentBuild properties
-        def total = currentBuild.totalTestCount ?: 0
-        def failed = currentBuild.failTestCount ?: 0
-        def skipped = currentBuild.skipTestCount ?: 0
-        def passed = total - failed - skipped
-        
-        def summary = "Tests: ${total} (✔${passed}, ✘${failed}, ↷${skipped})"
-        def state = (failed == 0 && total > 0) ? "success" : "failure"
-        
-        // If no tests were run at all, we should probably know
-        if (total == 0) {
-            summary = "No tests were executed."
-            state = "failure" 
-        }
+        // 1. Extract counts using shell commands to avoid Sandbox/Property issues
+        def total = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml | sed -n 's/.*tests=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print s}'", returnStdout: true).trim() ?: "0"
+        def failed = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml | sed -n 's/.*failures=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print s}'", returnStdout: true).trim() ?: "0"
+        def errors = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml | sed -n 's/.*errors=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print s}'", returnStdout: true).trim() ?: "0"
+        def skipped = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml | sed -n 's/.*skipped=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print s}'", returnStdout: true).trim() ?: "0"
 
+        // 2. Calculate totals
+        int failCount = (failed.toInteger() + errors.toInteger())
+        int passCount = total.toInteger() - failCount - skipped.toInteger()
+        
+        def summary = "Tests: ${total} (✔${passCount}, ✘${failCount}, ↷${skipped})"
+        def state = (failCount == 0 && total.toInteger() > 0) ? "success" : "failure"
+
+        // 3. Post to GitHub
         withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
           sh """
-          curl -s -H "Authorization: token $TOKEN" \
+          curl -s -H "Authorization: token \$TOKEN" \
           -H "Content-Type: application/json" \
           -X POST \
           https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/${GIT_COMMIT} \
           -d '{
             "state": "${state}",
-            "context": "CI/CD / Tests",
+            "context": "CI/CD / Unit Tests",
             "description": "${summary}",
             "target_url": "${BUILD_URL}"
           }'
