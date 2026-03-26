@@ -132,9 +132,9 @@ pipeline {
       script {
         // Check if the directory exists before grepping
         def reportDir = "target/surefire-reports"
-        def dirExists = sh(script: "[ -d ${reportDir} ] && echo 'true' || echo 'false'", returnStdout: true).trim()
+        def hasReports = sh(script: "[ -d ${reportDir} ] && ls ${reportDir}/*.xml >/dev/null 2>&1 && echo 'true' || echo 'false'", returnStdout: true).trim()
 
-        def summary = "Build failed before tests could run."
+        def summary = "Build Failed" 
         def state = "failure"
 
         if (dirExists == 'true') {
