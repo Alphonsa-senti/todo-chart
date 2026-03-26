@@ -12,6 +12,8 @@ pipeline {
     TEST_PASS  = '0'
     TEST_FAIL  = '0'
     TEST_SKIP  = '0'
+    SUMMARY    = ''
+    STATE      = ''
   }
 
   stages {
