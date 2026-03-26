@@ -63,39 +63,47 @@ pipeline {
     }
   }
 
+  script {
+    // Ensure commit SHA
+    env.GIT_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+    echo "Using commit: ${env.GIT_COMMIT}"
+  }
+
   post {
     success {
+      script { env.STATE = "success" }
       withCredentials([string(credentialsId: 'git-repo-status-token', variable: 'TOKEN')]) {
-        sh '''
-        curl -s -o /dev/null -w "%{http_code}" \
-        -H "Authorization: token $TOKEN" \
-        -H "Content-Type: application/json" \
-        -X POST \
-        https://api.github.com/repos/BaseDynamics/sentral-id/statuses/${GIT_COMMIT} \
+        sh """
+        curl -s -o /dev/null -w "%{http_code}" \\
+        -H "Authorization: token $TOKEN" \\
+        -H "Content-Type: application/json" \\
+        -X POST \\
+        https://api.github.com/repos/BaseDynamics/sentral-id/statuses/$GIT_COMMIT \\
         -d '{
-          "state": "success",
+          "state": "$STATE",
           "context": "CI/CD",
-          "description": "Build passed",
-          "target_url": "'${BUILD_URL}'"
+          "description": "$SUMMARY",
+          "target_url": "$BUILD_URL"
         }'
-        '''
+        """
       }
     }
     failure {
+      script { env.STATE = "failure" }
       withCredentials([string(credentialsId: 'git-repo-status-token', variable: 'TOKEN')]) {
-        sh '''
-        curl -s -o /dev/null -w "%{http_code}" \
-        -H "Authorization: token $TOKEN" \
-        -H "Content-Type: application/json" \
-        -X POST \
-        https://api.github.com/repos/BaseDynamics/sentral-id/statuses/${GIT_COMMIT} \
+        sh """
+        curl -s -o /dev/null -w "%{http_code}" \\
+        -H "Authorization: token $TOKEN" \\
+        -H "Content-Type: application/json" \\
+        -X POST \\
+        https://api.github.com/repos/BaseDynamics/sentral-id/statuses/$GIT_COMMIT \\
         -d '{
-          "state": "failure",
+          "state": "$STATE",
           "context": "CI/CD",
-          "description": "Build failed",
-          "target_url": "'${BUILD_URL}'"
+          "description": "$SUMMARY",
+          "target_url": "$BUILD_URL"
         }'
-        '''
+        """
       }
     }
   }
