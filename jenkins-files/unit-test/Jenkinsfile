@@ -8,12 +8,8 @@ pipeline {
   }
 
   environment {
-    TEST_TOTAL = '0'
-    TEST_PASS  = '0'
-    TEST_FAIL  = '0'
-    TEST_SKIP  = '0'
-    SUMMARY    = ''
-    STATE      = ''
+    SUMMARY = ''
+    STATE   = ''
   }
 
   stages {
@@ -24,13 +20,32 @@ pipeline {
       }
     }
 
-    stage('Unit Tests') {
+    stage('Run Tests & Capture Output') {
       steps {
-        sh 'mvn test'
-      }
-      post {
-        always {
-          junit allowEmptyResults: true, testResults: 'target/surefire-reports/*.xml'
+        script {
+          def output = sh(
+            script: 'mvn test',
+            returnStdout: true
+          )
+
+          echo output
+
+          // Extract test summary safely
+          def matcher = output =~ /Tests run: (\d+), Failures: (\d+), Errors: (\d+), Skipped: (\d+)/
+
+          if (matcher) {
+            def total = matcher[0][1].toInteger()
+            def fail  = matcher[0][2].toInteger()
+            def error = matcher[0][3].toInteger()
+            def skip  = matcher[0][4].toInteger()
+            def pass  = total - fail - error
+
+            env.SUMMARY = "Pass:${pass} Fail:${fail + error} Skip:${skip}"
+          } else {
+            env.SUMMARY = "No tests found"
+          }
+
+          echo "SUMMARY: ${env.SUMMARY}"
         }
       }
     }
@@ -39,11 +54,6 @@ pipeline {
       steps {
         sh 'mvn verify -DskipUnitTests=true'
       }
-      post {
-        always {
-          junit allowEmptyResults: true, testResults: 'target/failsafe-reports/*.xml'
-        }
-      }
     }
 
     stage('Code Coverage') {
@@ -51,74 +61,51 @@ pipeline {
         sh 'mvn jacoco:report'
       }
     }
-
-    stage('Collect Test Summary') {
-      steps {
-        script {
-          def action = currentBuild.rawBuild.getAction(hudson.tasks.junit.TestResultAction)
-
-          if (action != null) {
-            env.TEST_TOTAL = action.totalCount.toString()
-            env.TEST_FAIL  = action.failCount.toString()
-            env.TEST_SKIP  = action.skipCount.toString()
-            env.TEST_PASS  = (action.totalCount - action.failCount - action.skipCount).toString()
-          } else {
-            echo "No test results found!"
-          }
-
-          env.SUMMARY = "✔ ${env.TEST_PASS} | ✖ ${env.TEST_FAIL} | ⚠ ${env.TEST_SKIP}"
-        }
-      }
-    }
   }
 
   post {
 
-    always {
-      archiveArtifacts artifacts: 'target/**/*.xml', fingerprint: true
-    }
-
     success {
       script {
-        env.SUMMARY = "Pass:${env.TEST_PASS} Fail:${env.TEST_FAIL} Skip:${env.TEST_SKIP}"
-        
-        withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
-          sh '''
-          curl -s -o /dev/null -w "%{http_code}" \
-          -H "Authorization: token $TOKEN" \
-          -H "Content-Type: application/json" \
-          -X POST \
-          https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/${GIT_COMMIT} \
-          -d '{
-            "state": "success",
-            "context": "CI/CD",
-            "description": "'$SUMMARY'",
-            "target_url": "${BUILD_URL}"
-          }'
-          '''
-        }
+        env.STATE = "success"
+      }
+
+      withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
+        sh '''
+        curl -s -o /dev/null -w "%{http_code}" \
+        -H "Authorization: token '"$TOKEN"'" \
+        -H "Content-Type: application/json" \
+        -X POST \
+        https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/'"$GIT_COMMIT"' \
+        -d '{
+          "state": "'$STATE'",
+          "context": "CI/CD",
+          "description": "'$SUMMARY'",
+          "target_url": "'$BUILD_URL'console"
+        }'
+        '''
       }
     }
 
     failure {
       script {
-        def summary = "✔ ${env.TEST_PASS} | ✖ ${env.TEST_FAIL} | ⚠ ${env.TEST_SKIP}"
-        
-        withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
-          sh '''
-          curl -s -o /dev/null -w "%{http_code}" \
-          -H "Authorization: token $TOKEN" \
-          -H "Content-Type: application/json" \
-          -X POST \
-          https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/${GIT_COMMIT} \
-          -d '{
-            "state": "failure",
-            "context": "CI/CD",
-            "description": "'$SUMMARY'",
-            "target_url": "${BUILD_URL}"
-          }'
-          '''
-        }
+        env.STATE = "failure"
+      }
+
+      withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
+        sh '''
+        curl -s -o /dev/null -w "%{http_code}" \
+        -H "Authorization: token '"$TOKEN"'" \
+        -H "Content-Type: application/json" \
+        -X POST \
+        https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/'"$GIT_COMMIT"' \
+        -d '{
+          "state": "'$STATE'",
+          "context": "CI/CD",
+          "description": "'$SUMMARY'",
+          "target_url": "'$BUILD_URL'console"
+        }'
+        '''
       }
     }
   }
