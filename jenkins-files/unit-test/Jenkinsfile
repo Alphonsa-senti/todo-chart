@@ -1,4 +1,4 @@
-// def BRANCH = "${env.source_branch ?: 'main'}"
+def BRANCH = "${env.source_branch ?: 'main'}"
 
 // pipeline {
 //   agent any
