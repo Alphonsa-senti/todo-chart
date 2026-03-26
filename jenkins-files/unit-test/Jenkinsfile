@@ -68,40 +68,47 @@ pipeline {
 
   post {
     success {
-      script { env.STATE = "success" }
-      withCredentials([string(credentialsId: 'git-repo-status-token', variable: 'TOKEN')]) {
-        sh """
-        curl -s -o /dev/null -w "%{http_code}" \\
-        -H "Authorization: token $TOKEN" \\
-        -H "Content-Type: application/json" \\
-        -X POST \\
-        https://api.github.com/repos/BaseDynamics/sentral-id/statuses/$GIT_COMMIT \\
-        -d '{
-          "state": "$STATE",
-          "context": "CI/CD",
-          "description": "$SUMMARY",
-          "target_url": "$BUILD_URL"
-        }'
-        """
-      }
+        script {
+            env.STATE = "success"
+            env.SUMMARY = "Build passed"
+        }
+        withCredentials([string(credentialsId: 'git-repo-status-token', variable: 'TOKEN')]) {
+            sh """
+            curl -s -o /dev/null -w "%{http_code}" \\
+            -H "Authorization: token $TOKEN" \\
+            -H "Content-Type: application/json" \\
+            -X POST \\
+            https://api.github.com/repos/BaseDynamics/sentral-id/statuses/$GIT_COMMIT \\
+            -d '{
+              "state": "$env.STATE",
+              "context": "CI/CD",
+              "description": "$env.SUMMARY",
+              "target_url": "$BUILD_URL"
+            }'
+            """
+        }
     }
+
     failure {
-      script { env.STATE = "failure" }
-      withCredentials([string(credentialsId: 'git-repo-status-token', variable: 'TOKEN')]) {
-        sh """
-        curl -s -o /dev/null -w "%{http_code}" \\
-        -H "Authorization: token $TOKEN" \\
-        -H "Content-Type: application/json" \\
-        -X POST \\
-        https://api.github.com/repos/BaseDynamics/sentral-id/statuses/$GIT_COMMIT \\
-        -d '{
-          "state": "$STATE",
-          "context": "CI/CD",
-          "description": "$SUMMARY",
-          "target_url": "$BUILD_URL"
-        }'
-        """
-      }
+        script {
+            env.STATE = "failure"
+            env.SUMMARY = "Build failed"
+        }
+        withCredentials([string(credentialsId: 'git-repo-status-token', variable: 'TOKEN')]) {
+            sh """
+            curl -s -o /dev/null -w "%{http_code}" \\
+            -H "Authorization: token $TOKEN" \\
+            -H "Content-Type: application/json" \\
+            -X POST \\
+            https://api.github.com/repos/BaseDynamics/sentral-id/statuses/$GIT_COMMIT \\
+            -d '{
+              "state": "$env.STATE",
+              "context": "CI/CD",
+              "description": "$env.SUMMARY",
+              "target_url": "$BUILD_URL"
+            }'
+            """
+        }
     }
   }
 }
