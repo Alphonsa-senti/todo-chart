@@ -17,6 +17,9 @@ pipeline {
     stage('Checkout') {
       steps {
         checkout scm
+        script {
+          env.GIT_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+        }
       }
     }
 
@@ -61,12 +64,6 @@ pipeline {
         sh 'mvn jacoco:report'
       }
     }
-  }
-
-  script {
-    // Ensure commit SHA
-    env.GIT_COMMIT = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
-    echo "Using commit: ${env.GIT_COMMIT}"
   }
 
   post {
