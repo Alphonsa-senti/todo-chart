@@ -12,10 +12,13 @@ pipeline {
       steps {
         script {
           def branch = K8S_REPO_BRANCH.replaceAll('/', '_').toLowerCase()
-          def releaseType = branch.contains('fix') ? 'hotfix' : 'release'
+          def releaseType = (branch ==~ /.*(hotfix|issue[_\/]?fix).*/) ? 'hotfix' : 'release'
           env.RELEASE_TYPE = releaseType
+          env.RELEASE_TAG = "${ENV}-${env.RELEASE_TYPE}-${NOW}"
+
           echo "Branch: ${branch}"
           echo "Release type: ${env.RELEASE_TYPE}"
+          echo "Release tag: ${env.RELEASE_TAG}"
         }
       }
     }
@@ -24,14 +27,14 @@ pipeline {
       steps {
         sshagent(credentials: ['basedynamics']) {
           script {
-            def tag = "${ENV}-${env.RELEASE_TYPE}-${NOW}"
+            def tag = "${env.RELEASE_TAG}"
             echo "Docker Image Tag: ${tag}"
 
             sh """
               git checkout ${K8S_REPO_BRANCH} && git pull origin ${K8S_REPO_BRANCH} --no-rebase
-              sed -i "s/^\\(\\s*tag:\\s*\\).*/\\1${tag}/" ${K8S_DEPLOY_VALUE_FILE}
+              sed -i "s/^\\(\\s*tag:\\s*\\).*/\\1${env.RELEASE_TAG}/" ${K8S_DEPLOY_VALUE_FILE}
               git add ${K8S_DEPLOY_VALUE_FILE}
-              git commit -m "Latest Docker Image Tag Update: ${tag}" || echo "No changes to commit"
+              git commit -m "Latest Docker Image Tag Update: ${env.RELEASE_TAG}" || echo "No changes to commit"
               git push origin ${K8S_REPO_BRANCH}
             """
           }
@@ -43,13 +46,12 @@ pipeline {
       steps {
         sshagent(credentials: ['basedynamics']) {
           script {
-            def tag = "${ENV}-${env.RELEASE_TYPE}-${NOW}"
             sh """
-              if git rev-parse "${tag}" >/dev/null 2>&1; then
-                echo "Tag ${tag} already exists, skipping"
+              if git rev-parse "${env.RELEASE_TAG}" >/dev/null 2>&1; then
+                echo "Tag ${env.RELEASE_TAG} already exists, skipping"
               else
-                git tag ${tag}
-                git push origin ${tag}
+                git tag ${env.RELEASE_TAG}
+                git push origin ${env.RELEASE_TAG}  
               fi
             """
           }
