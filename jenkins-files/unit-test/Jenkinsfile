@@ -78,7 +78,7 @@ pipeline {
             -H "Authorization: token $TOKEN" \\
             -H "Content-Type: application/json" \\
             -X POST \\
-            https://api.github.com/repos/BaseDynamics/sentral-id/statuses/$GIT_COMMIT \\
+            https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/$GIT_COMMIT \\
             -d '{
               "state": "$env.STATE",
               "context": "CI/CD",
@@ -100,7 +100,7 @@ pipeline {
             -H "Authorization: token $TOKEN" \\
             -H "Content-Type: application/json" \\
             -X POST \\
-            https://api.github.com/repos/BaseDynamics/sentral-id/statuses/$GIT_COMMIT \\
+            https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/$GIT_COMMIT \\
             -d '{
               "state": "$env.STATE",
               "context": "CI/CD",
