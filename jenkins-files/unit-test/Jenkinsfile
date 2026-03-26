@@ -1,4 +1,93 @@
-def BRANCH = "${env.source_branch ?: 'main'}"
+// def BRANCH = "${env.source_branch ?: 'main'}"
+
+// pipeline {
+//   agent any
+
+//   tools {
+//     maven 'Maven 3.9.11'
+//   }
+
+//   stages {
+
+//     stage('Checkout') {
+//       steps {
+//         checkout scm
+//         // script {
+//         //   def branchToBuild = env.source_branch ?: 'main'
+//         //   checkout([
+//         //     $class: 'GitSCM',
+//         //     branches: [[name: "*/${branchToBuild}"]],
+//         //     userRemoteConfigs: [[
+//         //       url: 'https://github.com/Alphonsa-senti/todo-chart.git',
+//         //       credentialsId: 'basedynamics'
+//         //     ]]
+//         //   ])
+//         // }
+//       }
+//     }
+
+//     stage('Unit Tests') {
+//         steps {
+//             dir('.') {
+//                 sh 'mvn test'
+//             }
+//         }
+//     }
+
+//     stage('Integration Tests') {
+//         steps {
+//             dir('.') {
+//             sh 'mvn verify -DskipUnitTests=true'
+//             }
+//         }
+//     }
+
+//     stage('Code Coverage') {
+//         steps {
+//             sh 'mvn clean test jacoco:report'
+//         }
+//     }
+//   }
+
+
+//   post {
+//     success {
+//       withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
+//         sh '''
+//         curl -s -o /dev/null -w "%{http_code}" \
+//         -H "Authorization: token $TOKEN" \
+//         -H "Content-Type: application/json" \
+//         -X POST \
+//         https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/${GIT_COMMIT} \
+//         -d '{
+//           "state": "success",
+//           "context": "CI/CD",
+//           "description": "Build passed",
+//           "target_url": "'${BUILD_URL}'"
+//         }'
+//         '''
+//       }
+//     }
+//     failure {
+//       withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
+//         sh '''
+//         curl -s -o /dev/null -w "%{http_code}" \
+//         -H "Authorization: token $TOKEN" \
+//         -H "Content-Type: application/json" \
+//         -X POST \
+//         https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/${GIT_COMMIT} \
+//         -d '{
+//           "state": "failure",
+//           "context": "CI/CD",
+//           "description": "Build failed",
+//           "target_url": "'${BUILD_URL}'"
+//         }'
+//         '''
+//       }
+//     }
+//   }
+  
+// }
 
 pipeline {
   agent any
@@ -8,83 +97,75 @@ pipeline {
   }
 
   stages {
-
     stage('Checkout') {
       steps {
         checkout scm
-        // script {
-        //   def branchToBuild = env.source_branch ?: 'main'
-        //   checkout([
-        //     $class: 'GitSCM',
-        //     branches: [[name: "*/${branchToBuild}"]],
-        //     userRemoteConfigs: [[
-        //       url: 'https://github.com/Alphonsa-senti/todo-chart.git',
-        //       credentialsId: 'basedynamics'
-        //     ]]
-        //   ])
-        // }
       }
     }
 
     stage('Unit Tests') {
         steps {
-            dir('.') {
-                sh 'mvn test'
-            }
+            // Use -Dmaven.test.failure.ignore=true if you want the pipeline 
+            // to continue to the "Code Coverage" stage even if tests fail
+            sh 'mvn test'
         }
     }
 
     stage('Integration Tests') {
         steps {
-            dir('.') {
             sh 'mvn verify -DskipUnitTests=true'
-            }
         }
     }
 
     stage('Code Coverage') {
         steps {
-            sh 'mvn clean test jacoco:report'
+            sh 'mvn jacoco:report'
         }
     }
   }
 
-
   post {
-    success {
-      withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
-        sh '''
-        curl -s -o /dev/null -w "%{http_code}" \
-        -H "Authorization: token $TOKEN" \
-        -H "Content-Type: application/json" \
-        -X POST \
-        https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/${GIT_COMMIT} \
-        -d '{
-          "state": "success",
-          "context": "CI/CD",
-          "description": "Build passed",
-          "target_url": "'${BUILD_URL}'"
-        }'
-        '''
-      }
+    always {
+        // This parses the JUnit XML files so Jenkins knows the counts
+        junit '**/target/surefire-reports/*.xml'
     }
-    failure {
-      withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
-        sh '''
-        curl -s -o /dev/null -w "%{http_code}" \
-        -H "Authorization: token $TOKEN" \
-        -H "Content-Type: application/json" \
-        -X POST \
-        https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/${GIT_COMMIT} \
-        -d '{
-          "state": "failure",
-          "context": "CI/CD",
-          "description": "Build failed",
-          "target_url": "'${BUILD_URL}'"
-        }'
-        '''
+    
+    // We use 'always' or 'unsuccessful' to ensure the status is sent 
+    // regardless of the test outcome.
+    fixed { } // placeholder
+    
+    regression { } // placeholder
+
+    cleanup {
+      script {
+        def testResult = currentBuild.rawBuild.getAction(hudson.tasks.test.AbstractTestResultAction.class)
+        def summary = "No tests found"
+        
+        if (testResult != null) {
+            def total = testResult.totalCount
+            def failed = testResult.failCount
+            def skipped = testResult.skipCount
+            def passed = total - failed - skipped
+            summary = "Tests: ${total} (✔${passed}, ✘${failed}, ↷${skipped})"
+        }
+
+        def status = currentBuild.result == 'SUCCESS' ? 'success' : 'failure'
+        
+        withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
+          sh """
+          curl -s -H "Authorization: token $TOKEN" \
+          -H "Content-Type: application/json" \
+          -X POST \
+          https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/${GIT_COMMIT} \
+          -d '{
+            "state": "${status}",
+            "context": "CI/CD / Tests",
+            "description": "${summary}",
+            "target_url": "${BUILD_URL}"
+          }'
+          """
+        }
       }
     }
   }
-  
 }
