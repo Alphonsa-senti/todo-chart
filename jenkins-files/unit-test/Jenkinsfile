@@ -72,7 +72,7 @@ pipeline {
             env.STATE = "success"
             env.SUMMARY = "Build passed"
         }
-        withCredentials([string(credentialsId: 'git-repo-status-token', variable: 'TOKEN')]) {
+        withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
             sh """
             curl -s -o /dev/null -w "%{http_code}" \\
             -H "Authorization: token $TOKEN" \\
@@ -94,7 +94,7 @@ pipeline {
             env.STATE = "failure"
             env.SUMMARY = "Build failed"
         }
-        withCredentials([string(credentialsId: 'git-repo-status-token', variable: 'TOKEN')]) {
+        withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
             sh """
             curl -s -o /dev/null -w "%{http_code}" \\
             -H "Authorization: token $TOKEN" \\
