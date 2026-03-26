@@ -53,16 +53,18 @@ pipeline {
     stage('Collect Test Summary') {
       steps {
         script {
-          def testResult = currentBuild.rawBuild.getAction(hudson.tasks.junit.TestResultAction)
+          def action = currentBuild.rawBuild.getAction(hudson.tasks.junit.TestResultAction)
 
-          if (testResult != null) {
-            env.TEST_TOTAL = testResult.totalCount.toString()
-            env.TEST_FAIL  = testResult.failCount.toString()
-            env.TEST_SKIP  = testResult.skipCount.toString()
-            env.TEST_PASS  = (testResult.totalCount - testResult.failCount - testResult.skipCount).toString()
+          if (action != null) {
+            env.TEST_TOTAL = action.totalCount.toString()
+            env.TEST_FAIL  = action.failCount.toString()
+            env.TEST_SKIP  = action.skipCount.toString()
+            env.TEST_PASS  = (action.totalCount - action.failCount - action.skipCount).toString()
+          } else {
+            echo "No test results found!"
           }
 
-          echo "Total: ${env.TEST_TOTAL}, Passed: ${env.TEST_PASS}, Failed: ${env.TEST_FAIL}, Skipped: ${env.TEST_SKIP}"
+          env.SUMMARY = "✔ ${env.TEST_PASS} | ✖ ${env.TEST_FAIL} | ⚠ ${env.TEST_SKIP}"
         }
       }
     }
@@ -79,7 +81,7 @@ pipeline {
         def summary = "✔ ${env.TEST_PASS} | ✖ ${env.TEST_FAIL} | ⚠ ${env.TEST_SKIP}"
         
         withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
-          sh """
+          sh '''
           curl -s -o /dev/null -w "%{http_code}" \
           -H "Authorization: token $TOKEN" \
           -H "Content-Type: application/json" \
@@ -91,7 +93,7 @@ pipeline {
             "description": "Tests: ${summary}",
             "target_url": "${BUILD_URL}"
           }'
-          """
+          '''
         }
       }
     }
@@ -101,7 +103,7 @@ pipeline {
         def summary = "✔ ${env.TEST_PASS} | ✖ ${env.TEST_FAIL} | ⚠ ${env.TEST_SKIP}"
         
         withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
-          sh """
+          sh '''
           curl -s -o /dev/null -w "%{http_code}" \
           -H "Authorization: token $TOKEN" \
           -H "Content-Type: application/json" \
@@ -113,7 +115,7 @@ pipeline {
             "description": "Tests: ${summary}",
             "target_url": "${BUILD_URL}"
           }'
-          """
+          '''
         }
       }
     }
