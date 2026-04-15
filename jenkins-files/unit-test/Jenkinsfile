@@ -125,55 +125,112 @@ pipeline {
     }
   }
 
-  post {
-    always {
-      junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
+//   post {
+//     always {
+//       junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
       
-      script {
-        def reportDir = "target/surefire-reports"
-        // 1. Check if the report directory exists AND contains at least one XML file
-        def hasReports = sh(script: "[ -d ${reportDir} ] && ls ${reportDir}/*.xml >/dev/null 2>&1 && echo 'true' || echo 'false'", returnStdout: true).trim()
+//       script {
+//         def reportDir = "target/surefire-reports"
+//         // 1. Check if the report directory exists AND contains at least one XML file
+//         def hasReports = sh(script: "[ -d ${reportDir} ] && ls ${reportDir}/*.xml >/dev/null 2>&1 && echo 'true' || echo 'false'", returnStdout: true).trim()
 
-        // Default values for a Compilation/System failure
-        def summary = "Build Failed" 
-        def state = "failure"
+//         // Default values for a Compilation/System failure
+//         def summary = "Build Failed" 
+//         def state = "failure"
 
-        // 2. If reports exist, we can provide a detailed test count
-        if (hasReports == 'true') {
-            def totalStr = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*tests=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
-            def failStr  = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*failures=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
-            def errStr   = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*errors=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
-            def skipStr  = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*skipped=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+//         // 2. If reports exist, we can provide a detailed test count
+//         if (hasReports == 'true') {
+//             def totalStr = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*tests=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+//             def failStr  = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*failures=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+//             def errStr   = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*errors=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+//             def skipStr  = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*skipped=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
 
-            int total = totalStr.toInteger()
-            int failed = failStr.toInteger() + errStr.toInteger()
-            int skipped = skipStr.toInteger()
-            int passed = total - failed - skipped
+//             int total = totalStr.toInteger()
+//             int failed = failStr.toInteger() + errStr.toInteger()
+//             int skipped = skipStr.toInteger()
+//             int passed = total - failed - skipped
             
-            summary = "Tests: ${total} (Passed: ${passed}, Failed: ${failed}, Skipped: ${skipped})"
+//             summary = "Tests: ${total} (Passed: ${passed}, Failed: ${failed}, Skipped: ${skipped})"
             
-            // Only 'success' if the build passed AND there are no test failures
-            if (currentBuild.result == 'SUCCESS' && failed == 0 && total > 0) {
-                state = "success"
+//             // Only 'success' if the build passed AND there are no test failures
+//             if (currentBuild.result == 'SUCCESS' && failed == 0 && total > 0) {
+//                 state = "success"
+//             }
+//         }
+
+//         // 3. Send the API request to GitHub
+//         withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
+//           sh """
+//           curl -s -H "Authorization: token \$TOKEN" \
+//           -H "Content-Type: application/json" \
+//           -X POST \
+//           https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/${GIT_COMMIT} \
+//           -d '{
+//             "state": "${state}",
+//             "context": "CI/CD / Unit Tests",
+//             "description": "${summary}",
+//             "target_url": "${BUILD_URL}"
+//           }'
+//           """
+//         }
+//       }
+//     }
+//   }
+// }
+
+post {
+        always {
+            // 1. Record results in Jenkins (this makes the 'Test Result' graph appear)
+            junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
+            
+            script {
+                // 2. Fetch results from the Jenkins JUnit plugin instead of manually parsing XML
+                def testResult = currentBuild.rawBuild.getAction(hudson.tasks.test.AbstractTestResultAction.class)
+                
+                def state = "failure"
+                def summary = "Build error or no tests found"
+                
+                if (testResult != null) {
+                    def total = testResult.totalCount
+                    def failed = testResult.failCount
+                    def skipped = testResult.skipCount
+                    def passed = total - failed - skipped
+                    
+                    summary = "Tests: ${total} (Passed: ${passed}, Failed: ${failed}, Skipped: ${skipped})"
+                    
+                    // Logic: Success only if there are tests and 0 failures
+                    if (total > 0 && failed == 0) {
+                        state = "success"
+                    }
+                } else if (currentBuild.result == 'SUCCESS') {
+                    // Fallback if no tests were expected but build passed
+                    state = "success"
+                    summary = "Build completed successfully (no tests run)"
+                }
+
+                // 3. Update GitHub Status
+                updateGithubStatus(state, "CI/CD / Unit Tests", summary)
             }
         }
-
-        // 3. Send the API request to GitHub
-        withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
-          sh """
-          curl -s -H "Authorization: token \$TOKEN" \
-          -H "Content-Type: application/json" \
-          -X POST \
-          https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/${GIT_COMMIT} \
-          -d '{
-            "state": "${state}",
-            "context": "CI/CD / Unit Tests",
-            "description": "${summary}",
-            "target_url": "${BUILD_URL}"
-          }'
-          """
-        }
-      }
     }
-  }
+}
+
+/**
+ * Helper function to keep the pipeline clean
+ */
+def updateGithubStatus(String state, String context, String description) {
+    withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
+        sh """
+            curl -s -H "Authorization: token ${TOKEN}" \
+            -H "Content-Type: application/json" \
+            -X POST \
+            https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/${GIT_COMMIT} \
+            -d '{
+                "state": "${state}",
+                "context": "${context}",
+                "description": "${description}",
+                "target_url": "${env.BUILD_URL}"
+            }'
+        """
+    }
 }
