@@ -89,41 +89,41 @@ def BRANCH = "${env.source_branch ?: 'main'}"
   
 // }
 
-pipeline {
-  agent any
+// pipeline {
+//   agent any
 
-  tools {
-    maven 'Maven 3.9.11'
-  }
+//   tools {
+//     maven 'Maven 3.9.11'
+//   }
 
-  stages {
-    stage('Checkout') {
-      steps {
-        checkout scm
+//   stages {
+//     stage('Checkout') {
+//       steps {
+//         checkout scm
 
-        sh 'rm -rf target'
-      }
-    }
+//         sh 'rm -rf target'
+//       }
+//     }
 
-    stage('Unit Tests') {
-      steps {
-        // Continue even on failure so we can report the summary
-        sh 'mvn test -Dmaven.test.failure.ignore=true'
-      }
-    }
+//     stage('Unit Tests') {
+//       steps {
+//         // Continue even on failure so we can report the summary
+//         sh 'mvn test -Dmaven.test.failure.ignore=true'
+//       }
+//     }
 
-    stage('Integration Tests') {
-      steps {
-        sh 'mvn verify -DskipUnitTests=true -Dmaven.test.failure.ignore=true'
-      }
-    }
+//     stage('Integration Tests') {
+//       steps {
+//         sh 'mvn verify -DskipUnitTests=true -Dmaven.test.failure.ignore=true'
+//       }
+//     }
 
-    stage('Code Coverage') {
-      steps {
-        sh 'mvn jacoco:report'
-      }
-    }
-  }
+//     stage('Code Coverage') {
+//       steps {
+//         sh 'mvn jacoco:report'
+//       }
+//     }
+//   }
 
 //   post {
 //     always {
@@ -178,7 +178,44 @@ pipeline {
 //   }
 // }
 
-post {
+pipeline {
+    agent any
+
+    tools {
+        maven 'Maven 3.9.11'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+                // Clean target to ensure fresh results
+                sh 'rm -rf target'
+            }
+        }
+
+        stage('Build & Unit Tests') {
+            steps {
+                // We ignore failures here so the pipeline continues to the Post stage to report results
+                sh 'mvn clean test -Dmaven.test.failure.ignore=true'
+            }
+        }
+
+        stage('Integration Tests') {
+            steps {
+                sh 'mvn verify -DskipUnitTests=true -Dmaven.test.failure.ignore=true'
+            }
+        }
+
+        stage('Code Coverage') {
+            steps {
+                // Generates Jacoco reports if the plugin is configured in your pom.xml
+                sh 'mvn jacoco:report'
+            }
+        }
+    }
+
+    post {
         always {
             // 1. Record results in Jenkins (this makes the 'Test Result' graph appear)
             junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
