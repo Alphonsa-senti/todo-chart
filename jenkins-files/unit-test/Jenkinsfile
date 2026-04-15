@@ -189,72 +189,53 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
-                // Clean target to ensure fresh results
                 sh 'rm -rf target'
             }
         }
 
-        stage('Build & Unit Tests') {
+        stage('Unit Tests') {
             steps {
-                // We ignore failures here so the pipeline continues to the Post stage to report results
-                sh 'mvn clean test -Dmaven.test.failure.ignore=true'
-            }
-        }
-
-        stage('Integration Tests') {
-            steps {
-                sh 'mvn verify -DskipUnitTests=true -Dmaven.test.failure.ignore=true'
-            }
-        }
-
-        stage('Code Coverage') {
-            steps {
-                // Generates Jacoco reports if the plugin is configured in your pom.xml
-                sh 'mvn jacoco:report'
+                sh 'mvn test -Dmaven.test.failure.ignore=true'
             }
         }
     }
 
     post {
         always {
-            // 1. Record results in Jenkins (this makes the 'Test Result' graph appear)
             junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
             
             script {
-                // 2. Fetch results from the Jenkins JUnit plugin instead of manually parsing XML
-                def testResult = currentBuild.rawBuild.getAction(hudson.tasks.test.AbstractTestResultAction.class)
-                
+                def reportDir = "target/surefire-reports"
                 def state = "failure"
-                def summary = "Build error or no tests found"
-                
-                if (testResult != null) {
-                    def total = testResult.totalCount
-                    def failed = testResult.failCount
-                    def skipped = testResult.skipCount
-                    def passed = total - failed - skipped
+                def summary = "Build Failed"
+
+                // Check if reports exist using shell (safe)
+                def exists = sh(script: "[ -d ${reportDir} ] && ls ${reportDir}/*.xml >/dev/null 2>&1 && echo 'true' || echo 'false'", returnStdout: true).trim()
+
+                if (exists == 'true') {
+                    // Extract numbers using shell to avoid sandbox issues with Java File objects
+                    def total = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*tests=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim().toInteger()
+                    def fails = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*failures=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim().toInteger()
+                    def errs  = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*errors=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim().toInteger()
+                    def skips = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*skipped=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim().toInteger()
+
+                    def totalFailed = fails + errs
+                    def passed = total - totalFailed - skips
                     
-                    summary = "Tests: ${total} (Passed: ${passed}, Failed: ${failed}, Skipped: ${skipped})"
+                    summary = "Tests: ${total} (Passed: ${passed}, Failed: ${totalFailed}, Skipped: ${skips})"
                     
-                    // Logic: Success only if there are tests and 0 failures
-                    if (total > 0 && failed == 0) {
+                    // Logic for GitHub status
+                    if (total > 0 && totalFailed == 0) {
                         state = "success"
                     }
-                } else if (currentBuild.result == 'SUCCESS') {
-                    // Fallback if no tests were expected but build passed
-                    state = "success"
-                    summary = "Build completed successfully (no tests run)"
                 }
 
-                // 3. Update GitHub Status
                 updateGithubStatus(state, "CI/CD / Unit Tests", summary)
             }
         }
     }
 }
 
-/**
- * Helper function to keep the pipeline clean
- */
 def updateGithubStatus(String state, String context, String description) {
     withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
         sh """
