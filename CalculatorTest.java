@@ -1,32 +1,27 @@
-package com.example;
-
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Disabled;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class ExampleTest {
 
     @Test
     void testSuccess() {
-        // Assertion is correct: 1 + 1 = 2
-        assertEquals(2, 1 + 1); 
+        assertEquals(2, 1 + 1); // This will PASS
     }
 
     @Test
     void testFailure() {
-        // FIXED: Changed expectation from 10 to 2
-        assertEquals(2, 1 + 1); 
+        assertEquals(5, 1 + 1); // This will FAIL (AssertionError)
     }
 
     @Test
-    // FIXED: Removed @Disabled so the test runs and passes
+    @Disabled("Testing skip count")
     void testSkipped() {
-        assertEquals(4, 2 + 2);
+        // This will be SKIPPED because of @Disabled
     }
 
     @Test
     void testError() {
-        // FIXED: Removed the 'throw new RuntimeException'
-        int result = 5 + 5;
-        assertEquals(10, result);
+        throw new RuntimeException("Crash!"); // This is an ERROR (Exception)
     }
 }
