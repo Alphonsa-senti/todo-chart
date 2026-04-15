@@ -1,25 +1,29 @@
 package com.example;
 
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Disabled;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class CalculatorTest {
+public class ExampleTest {
 
     @Test
-    void testAdd() {
-        Calculator calc = new Calculator();
-        assertEquals(5, calc.add(2, 3));
+    void testSuccess() {
+        assertEquals(2, 1 + 1); // This will Pass
     }
 
     @Test
-    void testDivide() {
-        Calculator calc = new Calculator();
-        assertEquals(2, calc.divide(4, 2));
+    void testFailure() {
+        assertEquals(10, 1 + 1); // This will Fail (Assertion failure)
     }
 
     @Test
-    void testDivideByZero() {
-        Calculator calc = new Calculator();
-        assertThrows(ArithmeticException.class, () -> calc.divide(4, 0));
+    @Disabled("Testing skip count")
+    void testSkipped() {
+        // This will be Skipped
+    }
+
+    @Test
+    void testError() {
+        throw new RuntimeException("Crashed!"); // This counts as an Error
     }
 }

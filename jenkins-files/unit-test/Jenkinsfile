@@ -100,6 +100,8 @@ pipeline {
     stage('Checkout') {
       steps {
         checkout scm
+
+        sh 'rm -rf target'
       }
     }
 
@@ -125,27 +127,38 @@ pipeline {
 
   post {
     always {
-      // Record results for the Jenkins UI
       junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
       
       script {
-        // 1. Extract counts using shell (no emojis, just numbers)
-        def totalStr = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml | sed -n 's/.*tests=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
-        def failStr = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml | sed -n 's/.*failures=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
-        def errStr = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml | sed -n 's/.*errors=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
-        def skipStr = sh(script: "grep -h 'testsuite' target/surefire-reports/*.xml | sed -n 's/.*skipped=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+        def reportDir = "target/surefire-reports"
+        // 1. Check if the report directory exists AND contains at least one XML file
+        def hasReports = sh(script: "[ -d ${reportDir} ] && ls ${reportDir}/*.xml >/dev/null 2>&1 && echo 'true' || echo 'false'", returnStdout: true).trim()
 
-        // 2. Convert to Integers for calculation
-        int total = totalStr.toInteger()
-        int failed = failStr.toInteger() + errStr.toInteger()
-        int skipped = skipStr.toInteger()
-        int passed = total - failed - skipped
-        
-        // 3. Create the plain text summary
-        def summary = "Tests: ${total} (Passed: ${passed}, Failed: ${failed}, Skipped: ${skipped})"
-        def state = (failed == 0 && total > 0) ? "success" : "failure"
+        // Default values for a Compilation/System failure
+        def summary = "Build Failed" 
+        def state = "failure"
 
-        // 4. Send to GitHub
+        // 2. If reports exist, we can provide a detailed test count
+        if (hasReports == 'true') {
+            def totalStr = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*tests=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+            def failStr  = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*failures=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+            def errStr   = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*errors=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+            def skipStr  = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*skipped=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+
+            int total = totalStr.toInteger()
+            int failed = failStr.toInteger() + errStr.toInteger()
+            int skipped = skipStr.toInteger()
+            int passed = total - failed - skipped
+            
+            summary = "Tests: ${total} (Passed: ${passed}, Failed: ${failed}, Skipped: ${skipped})"
+            
+            // Only 'success' if the build passed AND there are no test failures
+            if (currentBuild.result == 'SUCCESS' && failed == 0 && total > 0) {
+                state = "success"
+            }
+        }
+
+        // 3. Send the API request to GitHub
         withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
           sh """
           curl -s -H "Authorization: token \$TOKEN" \
