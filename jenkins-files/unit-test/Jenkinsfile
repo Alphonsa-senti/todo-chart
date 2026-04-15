@@ -130,50 +130,92 @@ pipeline {
       junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
       
       script {
-        def reportDir = "target/surefire-reports"
-        // 1. Check if the report directory exists AND contains at least one XML file
-        def hasReports = sh(script: "[ -d ${reportDir} ] && ls ${reportDir}/*.xml >/dev/null 2>&1 && echo 'true' || echo 'false'", returnStdout: true).trim()
+        def testResultAction = currentBuild.rawBuild?.getAction(hudson.tasks.junit.TestResultAction)
+        int total = testResultAction?.totalCount ?: 0
+        int failed = testResultAction?.failCount ?: 0
+        int skipped = testResultAction?.skipCount ?: 0
+        int passed = total - failed - skipped
 
-        // Default values for a Compilation/System failure
-        def summary = "Build Failed" 
+        def summary = total > 0
+          ? "Tests: ${total} (Passed: ${passed}, Failed: ${failed}, Skipped: ${skipped})"
+          : "No test reports found"
         def state = "failure"
 
-        // 2. If reports exist, we can provide a detailed test count
-        if (hasReports == 'true') {
-            def totalStr = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*tests=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
-            def failStr  = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*failures=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
-            def errStr   = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*errors=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
-            def skipStr  = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*skipped=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
-
-            int total = totalStr.toInteger()
-            int failed = failStr.toInteger() + errStr.toInteger()
-            int skipped = skipStr.toInteger()
-            int passed = total - failed - skipped
-            
-            summary = "Tests: ${total} (Passed: ${passed}, Failed: ${failed}, Skipped: ${skipped})"
-            
-            // Only 'success' if the build passed AND there are no test failures
-            if (currentBuild.result == 'SUCCESS' && failed == 0 && total > 0) {
-                state = "success"
-            }
+        if (currentBuild.currentResult == 'SUCCESS' && failed == 0 && total > 0) {
+          state = "success"
         }
 
-        // 3. Send the API request to GitHub
-        withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
+        def payload = groovy.json.JsonOutput.toJson([
+          state      : state,
+          context    : 'CI/CD',
+          description: summary,
+          target_url : env.BUILD_URL
+        ])
+
+        withCredentials([string(credentialsId: 'git-repo-status-token', variable: 'TOKEN')]) {
+          withEnv(["GITHUB_STATUS_PAYLOAD=${payload}"]) {
           sh """
-          curl -s -H "Authorization: token \$TOKEN" \
+          curl --fail -sS -H "Authorization: token \$TOKEN" \
           -H "Content-Type: application/json" \
           -X POST \
-          https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/${GIT_COMMIT} \
-          -d '{
-            "state": "${state}",
-            "context": "CI/CD / Unit Tests",
-            "description": "${summary}",
-            "target_url": "${BUILD_URL}"
-          }'
+          https://api.github.com/repos/BaseDynamics/sentral-id/statuses/${env.GIT_COMMIT} \
+          -d "\$GITHUB_STATUS_PAYLOAD"
           """
+          }
         }
       }
     }
   }
+
+  // post {
+  //   always {
+  //     junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
+      
+  //     script {
+  //       def reportDir = "target/surefire-reports"
+  //       // 1. Check if the report directory exists AND contains at least one XML file
+  //       def hasReports = sh(script: "[ -d ${reportDir} ] && ls ${reportDir}/*.xml >/dev/null 2>&1 && echo 'true' || echo 'false'", returnStdout: true).trim()
+
+  //       // Default values for a Compilation/System failure
+  //       def summary = "Build Failed" 
+  //       def state = "failure"
+
+  //       // 2. If reports exist, we can provide a detailed test count
+  //       if (hasReports == 'true') {
+  //           def totalStr = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*tests=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+  //           def failStr  = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*failures=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+  //           def errStr   = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*errors=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+  //           def skipStr  = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*skipped=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+
+  //           int total = totalStr.toInteger()
+  //           int failed = failStr.toInteger() + errStr.toInteger()
+  //           int skipped = skipStr.toInteger()
+  //           int passed = total - failed - skipped
+            
+  //           summary = "Tests: ${total} (Passed: ${passed}, Failed: ${failed}, Skipped: ${skipped})"
+            
+  //           // Only 'success' if the build passed AND there are no test failures
+  //           if (currentBuild.result == 'SUCCESS' && failed == 0 && total > 0) {
+  //               state = "success"
+  //           }
+  //       }
+
+  //       // 3. Send the API request to GitHub
+  //       withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
+  //         sh """
+  //         curl -s -H "Authorization: token \$TOKEN" \
+  //         -H "Content-Type: application/json" \
+  //         -X POST \
+  //         https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/${GIT_COMMIT} \
+  //         -d '{
+  //           "state": "${state}",
+  //           "context": "CI/CD / Unit Tests",
+  //           "description": "${summary}",
+  //           "target_url": "${BUILD_URL}"
+  //         }'
+  //         """
+  //       }
+  //     }
+  //   }
+  // }
 }
