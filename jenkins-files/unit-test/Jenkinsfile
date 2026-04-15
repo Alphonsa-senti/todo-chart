@@ -89,166 +89,91 @@ def BRANCH = "${env.source_branch ?: 'main'}"
   
 // }
 
-// pipeline {
-//   agent any
-
-//   tools {
-//     maven 'Maven 3.9.11'
-//   }
-
-//   stages {
-//     stage('Checkout') {
-//       steps {
-//         checkout scm
-
-//         sh 'rm -rf target'
-//       }
-//     }
-
-//     stage('Unit Tests') {
-//       steps {
-//         // Continue even on failure so we can report the summary
-//         sh 'mvn test -Dmaven.test.failure.ignore=true'
-//       }
-//     }
-
-//     stage('Integration Tests') {
-//       steps {
-//         sh 'mvn verify -DskipUnitTests=true -Dmaven.test.failure.ignore=true'
-//       }
-//     }
-
-//     stage('Code Coverage') {
-//       steps {
-//         sh 'mvn jacoco:report'
-//       }
-//     }
-//   }
-
-//   post {
-//     always {
-//       junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
-      
-//       script {
-//         def reportDir = "target/surefire-reports"
-//         // 1. Check if the report directory exists AND contains at least one XML file
-//         def hasReports = sh(script: "[ -d ${reportDir} ] && ls ${reportDir}/*.xml >/dev/null 2>&1 && echo 'true' || echo 'false'", returnStdout: true).trim()
-
-//         // Default values for a Compilation/System failure
-//         def summary = "Build Failed" 
-//         def state = "failure"
-
-//         // 2. If reports exist, we can provide a detailed test count
-//         if (hasReports == 'true') {
-//             def totalStr = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*tests=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
-//             def failStr  = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*failures=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
-//             def errStr   = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*errors=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
-//             def skipStr  = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*skipped=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
-
-//             int total = totalStr.toInteger()
-//             int failed = failStr.toInteger() + errStr.toInteger()
-//             int skipped = skipStr.toInteger()
-//             int passed = total - failed - skipped
-            
-//             summary = "Tests: ${total} (Passed: ${passed}, Failed: ${failed}, Skipped: ${skipped})"
-            
-//             // Only 'success' if the build passed AND there are no test failures
-//             if (currentBuild.result == 'SUCCESS' && failed == 0 && total > 0) {
-//                 state = "success"
-//             }
-//         }
-
-//         // 3. Send the API request to GitHub
-//         withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
-//           sh """
-//           curl -s -H "Authorization: token \$TOKEN" \
-//           -H "Content-Type: application/json" \
-//           -X POST \
-//           https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/${GIT_COMMIT} \
-//           -d '{
-//             "state": "${state}",
-//             "context": "CI/CD / Unit Tests",
-//             "description": "${summary}",
-//             "target_url": "${BUILD_URL}"
-//           }'
-//           """
-//         }
-//       }
-//     }
-//   }
-// }
-
 pipeline {
-    agent any
+  agent any
 
-    tools {
-        maven 'Maven 3.9.11'
+  tools {
+    maven 'Maven 3.9.11'
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+
+        sh 'rm -rf target'
+      }
     }
 
-    stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
-                sh 'rm -rf target'
-            }
-        }
-
-        stage('Unit Tests') {
-            steps {
-                sh 'mvn test -Dmaven.test.failure.ignore=true'
-            }
-        }
+    stage('Unit Tests') {
+      steps {
+        // Continue even on failure so we can report the summary
+        sh 'mvn test -Dmaven.test.failure.ignore=true'
+      }
     }
 
-    post {
-        always {
-            junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
+    stage('Integration Tests') {
+      steps {
+        sh 'mvn verify -DskipUnitTests=true -Dmaven.test.failure.ignore=true'
+      }
+    }
+
+    stage('Code Coverage') {
+      steps {
+        sh 'mvn jacoco:report'
+      }
+    }
+  }
+
+  post {
+    always {
+      junit testResults: '**/target/surefire-reports/*.xml', allowEmptyResults: true
+      
+      script {
+        def reportDir = "target/surefire-reports"
+        // 1. Check if the report directory exists AND contains at least one XML file
+        def hasReports = sh(script: "[ -d ${reportDir} ] && ls ${reportDir}/*.xml >/dev/null 2>&1 && echo 'true' || echo 'false'", returnStdout: true).trim()
+
+        // Default values for a Compilation/System failure
+        def summary = "Build Failed" 
+        def state = "failure"
+
+        // 2. If reports exist, we can provide a detailed test count
+        if (hasReports == 'true') {
+            def totalStr = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*tests=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+            def failStr  = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*failures=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+            def errStr   = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*errors=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+            def skipStr  = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*skipped=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim()
+
+            int total = totalStr.toInteger()
+            int failed = failStr.toInteger() + errStr.toInteger()
+            int skipped = skipStr.toInteger()
+            int passed = total - failed - skipped
             
-            script {
-                def reportDir = "target/surefire-reports"
-                def state = "failure"
-                def summary = "Build Failed"
-
-                // Check if reports exist using shell (safe)
-                def exists = sh(script: "[ -d ${reportDir} ] && ls ${reportDir}/*.xml >/dev/null 2>&1 && echo 'true' || echo 'false'", returnStdout: true).trim()
-
-                if (exists == 'true') {
-                    // Extract numbers using shell to avoid sandbox issues with Java File objects
-                    def total = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*tests=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim().toInteger()
-                    def fails = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*failures=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim().toInteger()
-                    def errs  = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*errors=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim().toInteger()
-                    def skips = sh(script: "grep -h 'testsuite' ${reportDir}/*.xml | sed -n 's/.*skipped=\"\\([0-9]*\\)\".*/\\1/p' | awk '{s+=\$1} END {print (s==\"\"?0:s)}'", returnStdout: true).trim().toInteger()
-
-                    def totalFailed = fails + errs
-                    def passed = total - totalFailed - skips
-                    
-                    summary = "Tests: ${total} (Passed: ${passed}, Failed: ${totalFailed}, Skipped: ${skips})"
-                    
-                    // Logic for GitHub status
-                    if (total > 0 && totalFailed == 0) {
-                        state = "success"
-                    }
-                }
-
-                updateGithubStatus(state, "CI/CD / Unit Tests", summary)
+            summary = "Tests: ${total} (Passed: ${passed}, Failed: ${failed}, Skipped: ${skipped})"
+            
+            // Only 'success' if the build passed AND there are no test failures
+            if (currentBuild.result == 'SUCCESS' && failed == 0 && total > 0) {
+                state = "success"
             }
         }
-    }
-}
 
-def updateGithubStatus(String state, String context, String description) {
-    withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
-        sh """
-            curl -s -H "Authorization: token ${TOKEN}" \
-            -H "Content-Type: application/json" \
-            -X POST \
-            https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/${GIT_COMMIT} \
-            -d '{
-                "state": "${state}",
-                "context": "${context}",
-                "description": "${description}",
-                "target_url": "${env.BUILD_URL}"
-            }'
-        """
+        // 3. Send the API request to GitHub
+        withCredentials([string(credentialsId: 'git-cred', variable: 'TOKEN')]) {
+          sh """
+          curl -s -H "Authorization: token \$TOKEN" \
+          -H "Content-Type: application/json" \
+          -X POST \
+          https://api.github.com/repos/Alphonsa-senti/todo-chart/statuses/${GIT_COMMIT} \
+          -d '{
+            "state": "${state}",
+            "context": "CI/CD / Unit Tests",
+            "description": "${summary}",
+            "target_url": "${BUILD_URL}"
+          }'
+          """
+        }
+      }
     }
+  }
 }
