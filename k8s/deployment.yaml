@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: java-calculator
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: java-calculator
+
+  template:
+    metadata:
+      labels:
+        app: java-calculator
+
+    spec:
+      containers:
+        - name: java-calculator
+          image: alpha260/java-calculator:v1.0
+          imagePullPolicy: Always
