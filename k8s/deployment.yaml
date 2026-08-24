@@ -18,5 +18,5 @@ spec:
     spec:
       containers:
         - name: java-calculator
-          image: alpha260/java-calculator:v1.1
+          image: alpha260/java-calculator:v1.2
           imagePullPolicy: Always
