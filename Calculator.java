@@ -4,7 +4,7 @@ public class Calculator {
 
         String value = null;
 
-        System.out.println("Value length: " + (value != null ? value.length() : 0));
+        System.out.println("Value length: " + value.length());
 
         double a = 10;
         double b = 5;
