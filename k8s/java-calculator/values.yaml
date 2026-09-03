@@ -2,7 +2,7 @@ replicaCount: 1
 image:
   repository: alpha260/java-calculator
   pullPolicy: Always
-  tag: "v1.8"
+  tag: "v1.9"
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
