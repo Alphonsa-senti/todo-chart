@@ -2,7 +2,7 @@ public class Calculator {
 
     public static void main(String[] args) {
 
-        String value = "null";
+        String value = null;
 
         System.out.println("Value length: " + (value != null ? value.length() : 0));
 
