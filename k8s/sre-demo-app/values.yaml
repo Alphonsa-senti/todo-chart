@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: alpha260/sre-demo-app
-  tag: "v1.0"
+  tag: "v1.3"
   pullPolicy: IfNotPresent
 
 service:

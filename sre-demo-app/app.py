@@ -1,5 +1,7 @@
 from flask import Flask, jsonify
 import logging
+import time
+import os
 
 app = Flask(__name__)
 
@@ -8,18 +10,10 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(message)s"
 )
 
-orders = [
-    {
-        "id": 101,
-        "customer": "Alice",
-        "amount": 49.99
-    },
-    {
-        "id": 102,
-        "customer": "Bob",
-        "amount": 29.99
-    }
-]
+START_TIME = time.time()
+
+# Crash after 60 seconds
+CRASH_AFTER_SECONDS = 60
 
 
 @app.route("/health")
@@ -27,28 +21,56 @@ def health():
     return jsonify({"status": "ok"})
 
 
-@app.route("/api/orders")
-def get_orders():
-    logging.info("Fetching orders")
+@app.route("/")
+def home():
+    return jsonify({
+        "service": "sre-demo-app",
+        "status": "running"
+    })
 
-    result = []
 
-    for order in orders:
-        logging.info("Processing order %s", order["id"])
+def check_for_production_issue():
+    uptime = time.time() - START_TIME
 
-        # INTENTIONAL BUG:
-        # The data contains "customer", but the code expects "customer_name".
-        customer_name = order["customer_name"]
+    if uptime >= CRASH_AFTER_SECONDS:
+        logging.error(
+            "CRITICAL: Database connection initialization failed"
+        )
 
-        result.append({
-            "id": order["id"],
-            "customer": customer_name,
-            "amount": order["amount"]
-        })
+        logging.error(
+            "CRITICAL: Unable to initialize database configuration"
+        )
 
-    return jsonify(result)
+        # INTENTIONAL BUG
+        database_config = None
+
+        # This raises:
+        # TypeError: 'NoneType' object is not subscriptable
+        host = database_config["host"]
+
+        logging.info("Database host: %s", host)
 
 
 if __name__ == "__main__":
     logging.info("Starting SRE demo application")
-    app.run(host="0.0.0.0", port=8080)
+    logging.info(
+        "Application will crash after %s seconds",
+        CRASH_AFTER_SECONDS
+    )
+
+    # Check every 5 seconds.
+    while True:
+        uptime = time.time() - START_TIME
+
+        if uptime >= CRASH_AFTER_SECONDS:
+            logging.error(
+                "Production failure detected after %.1f seconds",
+                uptime
+            )
+
+            check_for_production_issue()
+
+            # Should never reach here.
+            os._exit(1)
+
+        time.sleep(5)
