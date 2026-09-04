@@ -4,6 +4,6 @@ WORKDIR /app
 
 COPY src/main/java/Calculator.java .
 
-RUN java Calculator.java
+RUN javac Calculator.java
 
 CMD ["java", "Calculator"]
